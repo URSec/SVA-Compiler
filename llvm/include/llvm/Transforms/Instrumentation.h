@@ -201,6 +201,9 @@ static inline uint32_t scaleBranchCount(uint64_t Count, uint64_t Scale) {
   return Scaled;
 }
 
+/// This pass performs SVA's CFI transformation on the code.
+FunctionPass *createCFIPass();
+
 /// This pass performs SVA's SFI transformation on the code.
 FunctionPass *createSFIPass();
 } // end namespace llvm

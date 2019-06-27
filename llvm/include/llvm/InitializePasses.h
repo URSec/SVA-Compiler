@@ -365,6 +365,7 @@ void initializeRewriteStatepointsForGCLegacyPassPass(PassRegistry &);
 void initializeRewriteSymbolsLegacyPassPass(PassRegistry&);
 void initializeSCCPLegacyPassPass(PassRegistry&);
 void initializeSCEVAAWrapperPassPass(PassRegistry&);
+void initializeLegacyCFIPass(PassRegistry&);
 void initializeLegacySFIPass(PassRegistry&);
 void initializeSLPVectorizerPass(PassRegistry&);
 void initializeSROALegacyPassPass(PassRegistry&);
