@@ -146,6 +146,23 @@ let Constraints = "$src = $dst", isMoveImm = 1, isPseudo = 1, Defs = [EFLAGS] in
                   Requires<[In64BitMode]>, Sched<[WriteALU]>;
 }
 
+let isPseudo = 1 in {
+  /// The CFI label is actually two instructions, but MCInst lowering isn't
+  /// equiped to handle one instruction turning into two. However, it is also a
+  /// pain to lower the CFI label before MCInst lowering because the real
+  /// instructions appear to both define and use %rcx and %rdx, which can
+  /// confuse some of the MIR analyses. Therefore, we first split the CFI label
+  /// into two seperate parts during pseudo-instruction lowering and then lower
+  /// each part separately duning MCInst lowering.
+  multiclass CFI_LABEL_PARTS {
+    def _0 : PseudoI<(outs), (ins), []>;
+    def _1 : PseudoI<(outs), (ins), []>;
+  }
+
+  /// The split parts of a CFI label.
+  defm CFI_LABEL_PART : CFI_LABEL_PARTS;
+}
+
 //===----------------------------------------------------------------------===//
 // EH Pseudo Instructions
 //

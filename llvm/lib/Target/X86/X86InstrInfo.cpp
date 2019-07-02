@@ -4070,10 +4070,38 @@ static bool expandSHXDROT(MachineInstrBuilder &MIB, const MCInstrDesc &Desc) {
   return true;
 }
 
+/// Expand a CFI label pseudo-instruction into a separate pseudo-instruction
+/// for each individual instruction that will comprise the label.
+///
+/// The invididual label part pseudo-instructions will be replaced with real
+/// instructions during MCInst lowering. See the comment in X86InstrCompiled.td
+/// for why we do this in two parts.
+///
+/// @param MIB      The instruction builder to build the label's replacement.
+/// @param Pt0Desc  The instruction info for the first CFI label fragment.
+/// @param Pt1Desc  The instruction info for the second CFI label fragment.
+/// @return         True, signifying that a replacement occured.
+static bool expandCFILabel(MachineInstrBuilder &MIB,
+                           const MCInstrDesc &Pt0Desc,
+                           const MCInstrDesc &Pt1Desc) {
+  MIB->setDesc(Pt0Desc);
+
+  BuildMI(*MIB->getParent(),
+          std::next(MachineBasicBlock::iterator(MIB.getInstr())),
+          MIB->getDebugLoc(),
+          Pt1Desc);
+
+  return true;
+}
+
 bool X86InstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
   bool HasAVX = Subtarget.hasAVX();
   MachineInstrBuilder MIB(*MI.getParent()->getParent(), MI);
   switch (MI.getOpcode()) {
+  case X86::CFI_LABEL:
+    return expandCFILabel(MIB,
+                          get(X86::CFI_LABEL_PART_0),
+                          get(X86::CFI_LABEL_PART_1));
   case X86::MOV32r0:
     return Expand2AddrUndef(MIB, get(X86::XOR32rr));
   case X86::MOV32r1:

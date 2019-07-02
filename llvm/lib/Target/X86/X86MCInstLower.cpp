@@ -708,7 +708,20 @@ void X86MCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
       OutMI.erase(&OutMI.getOperand(OutMI.getNumOperands() - 1));
       break;
     }
+    break;
+  }
 
+  // CFI label pseudo-instructions
+  case X86::CFI_LABEL_PART_0: {
+    OutMI.setOpcode(X86::MOV32rr);
+    OutMI.addOperand(MCOperand::createReg(X86::ECX));
+    OutMI.addOperand(MCOperand::createReg(X86::ECX));
+    break;
+  }
+  case X86::CFI_LABEL_PART_1: {
+    OutMI.setOpcode(X86::MOV32rr);
+    OutMI.addOperand(MCOperand::createReg(X86::EDX));
+    OutMI.addOperand(MCOperand::createReg(X86::EDX));
     break;
   }
 
