@@ -285,6 +285,9 @@ static cl::opt<bool>
                            cl::desc("Always emit a debug frame section."),
                            cl::init(false));
 
+static cl::opt<bool>
+    SVA("sva", cl::desc("Enable SVA"), cl::init(false));
+
 // Common utility function tightly tied to the options listed here. Initializes
 // a TargetOptions object with CodeGen flags and returns it.
 static TargetOptions InitTargetOptionsFromCodeGenFlags() {
@@ -323,6 +326,8 @@ static TargetOptions InitTargetOptionsFromCodeGenFlags() {
   Options.ThreadModel = TMModel;
   Options.EABIVersion = EABIVersion;
   Options.DebuggerTuning = DebuggerTuningOpt;
+
+  Options.SVA = SVA;
 
   return Options;
 }
