@@ -1244,6 +1244,13 @@ def ICALL_BRANCH_FUNNEL : StandardPseudoInstruction {
   let AsmString = "";
   let hasSideEffects = 1;
 }
+/// CFI label pseudo-instruction.
+def CFI_LABEL : StandardPseudoInstruction {
+  let OutOperandList = (outs);
+  let InOperandList = (ins);
+  let AsmString = "# CFI Label";
+  let hasSideEffects = 0;
+}
 
 // Generic opcodes used in GlobalISel.
 include "llvm/Target/GenericOpcodes.td"
