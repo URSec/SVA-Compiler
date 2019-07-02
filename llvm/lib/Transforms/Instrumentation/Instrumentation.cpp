@@ -119,6 +119,7 @@ void llvm::initializeInstrumentation(PassRegistry &Registry) {
   initializeThreadSanitizerLegacyPassPass(Registry);
   initializeModuleSanitizerCoverageLegacyPassPass(Registry);
   initializeDataFlowSanitizerPass(Registry);
+  initializeLegacySFIPass(Registry);
 }
 
 /// LLVMInitializeInstrumentation - C binding for

@@ -200,6 +200,9 @@ static inline uint32_t scaleBranchCount(uint64_t Count, uint64_t Scale) {
   assert(Scaled <= std::numeric_limits<uint32_t>::max() && "overflow 32-bits");
   return Scaled;
 }
+
+/// This pass performs SVA's SFI transformation on the code.
+FunctionPass *createSFIPass();
 } // end namespace llvm
 
 #endif // LLVM_TRANSFORMS_INSTRUMENTATION_H
