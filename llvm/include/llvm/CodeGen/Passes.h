@@ -466,6 +466,8 @@ namespace llvm {
   /// Create IR Type Promotion pass. \see TypePromotion.cpp
   FunctionPass *createTypePromotionPass();
 
+  /// Create the CFI label insertion pass.
+  FunctionPass *createCFILabelInserter();
 } // End llvm namespace
 
 #endif
