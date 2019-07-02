@@ -3297,6 +3297,14 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
     }
   }
 
+  Opts.SVA = Args.hasArg(OPT_sva);
+  Opts.SVA_CFI = Args.hasArg(OPT_fsva_cfi);
+  Opts.SVA_CET = Args.hasArg(OPT_fsva_use_cet);
+  Opts.SVA_SFI = Args.hasArg(OPT_fsva_sfi);
+  Opts.SVA_CHECK_LOADS = Args.hasArg(OPT_fsva_check_loads);
+  Opts.SVA_MPX = Args.hasArg(OPT_fsva_use_mpx);
+  Opts.SVA_PROTECT_SVA_MEM = Args.hasArg(OPT_fsva_protect_sva_mem);
+
   Opts.CompleteMemberPointers = Args.hasArg(OPT_fcomplete_member_pointers);
   Opts.BuildingPCHWithObjectFile = Args.hasArg(OPT_building_pch_with_obj);
 }
@@ -3569,6 +3577,7 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Res,
     LangOpts.PIE = Args.hasArg(OPT_pic_is_pie);
     parseSanitizerKinds("-fsanitize=", Args.getAllArgValues(OPT_fsanitize_EQ),
                         Diags, LangOpts.Sanitize);
+    LangOpts.SVA = Args.hasArg(OPT_sva);
   } else {
     // Other LangOpts are only initialized when the input is not AST or LLVM IR.
     // FIXME: Should we really be calling this for an Language::Asm input?

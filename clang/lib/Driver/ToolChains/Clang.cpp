@@ -5666,6 +5666,49 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                    options::OPT_fno_apple_pragma_pack, false))
     CmdArgs.push_back("-fapple-pragma-pack");
 
+  if (Args.hasFlag(options::OPT_sva, options::OPT_no_sva, false)) {
+    CmdArgs.push_back("-sva");
+
+    if (Args.hasFlag(options::OPT_fsva_cfi, options::OPT_fno_sva_cfi, true)) {
+      CmdArgs.push_back("-fsva-cfi");
+    }
+    if (Args.hasFlag(options::OPT_fsva_use_cet,
+                     options::OPT_fno_sva_use_cet, false)) {
+      CmdArgs.push_back("-fsva-use_cet");
+    }
+    if (Args.hasFlag(options::OPT_fsva_sfi, options::OPT_fno_sva_sfi, true)) {
+      CmdArgs.push_back("-fsva-sfi");
+    }
+    if (Args.hasFlag(options::OPT_fsva_use_mpx,
+                     options::OPT_fno_sva_use_mpx, false)) {
+      CmdArgs.push_back("-fsva-use-mpx");
+    }
+    if (Args.hasFlag(options::OPT_fsva_check_loads,
+                     options::OPT_fno_sva_check_loads, false)) {
+      CmdArgs.push_back("-fsva-check-loads");
+    }
+    if (Args.hasFlag(options::OPT_fsva_protect_sva_mem,
+                     options::OPT_fno_sva_protect_sva_mem, false)) {
+      CmdArgs.push_back("-fsva-protect-sva-mem");
+    }
+  } else {
+    for (const Arg* A : Args.filtered(options::OPT_fsva_cfi,
+                                      options::OPT_fno_sva_cfi,
+                                      options::OPT_fsva_use_cet,
+                                      options::OPT_fno_sva_use_cet,
+                                      options::OPT_fsva_sfi,
+                                      options::OPT_fno_sva_sfi,
+                                      options::OPT_fsva_use_mpx,
+                                      options::OPT_fno_sva_use_mpx,
+                                      options::OPT_fsva_check_loads,
+                                      options::OPT_fno_sva_check_loads,
+                                      options::OPT_fsva_protect_sva_mem,
+                                      options::OPT_fno_sva_protect_sva_mem)) {
+      D.Diag(diag::err_drv_argument_only_allowed_with) << A->getAsString(Args)
+                                                       << "-sva";
+    }
+  }
+
   // Remarks can be enabled with any of the `-f.*optimization-record.*` flags.
   if (willEmitRemarks(Args) && checkRemarksOptions(D, Args, Triple))
     renderRemarksOptions(Args, CmdArgs, Triple, Input, Output, JA);

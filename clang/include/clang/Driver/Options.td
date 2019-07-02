@@ -1965,6 +1965,43 @@ def fallow_editor_placeholders : Flag<["-"], "fallow-editor-placeholders">,
 def fno_allow_editor_placeholders : Flag<["-"],
   "fno-allow-editor-placeholders">, Group<f_Group>;
 
+def fsva_cfi : Flag<["-"], "fsva-cfi">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Instrument the code with SVA's control-flow integrity">;
+def fno_sva_cfi : Flag<["-"], "fno-sva-cfi">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Don't instrument the code with SVA's control-flow integrity">;
+def fsva_check_loads : Flag<["-"], "fsva-check-loads">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Check loads with SVA's software fault isolation">;
+def fno_sva_check_loads : Flag<["-"], "fno-sva-check-loads">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Don't check loads with SVA's software fault isolation">;
+def fsva_sfi : Flag<["-"], "fsva-sfi">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Instrument the code with SVA's software fault isolation">;
+def fno_sva_sfi : Flag<["-"], "fno-sva-sfi">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Don't instrument the code with SVA's software fault isolation">;
+def fsva_protect_sva_mem : Flag<["-"], "fsva-protect-sva-mem">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Add extra checks to protect SVA's private memory region.">;
+def fno_sva_protect_sva_mem : Flag<["-"], "fno-sva-protect-sva-mem">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Don't add extra checks to protect SVA's private memory region.">;
+def fsva_use_cet : Flag<["-"], "fsva-use-cet">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Use Intel's CET extentions for SVA's control-flow integrity">;
+def fno_sva_use_cet : Flag<["-"], "fno-sva-use-cet">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Don't use Intel's CET extentions for SVA's control-flow integrity">;
+def fsva_use_mpx : Flag<["-"], "fsva-use-mpx">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Use Intel's MPX extentions for SVA's memory protection">;
+def fno_sva_use_mpx : Flag<["-"], "fno-sva-use-mpx">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Don't use Intel's MPX extentions for SVA's memory protection">;
+
 def fdebug_types_section: Flag <["-"], "fdebug-types-section">, Group<f_Group>,
   Flags<[CC1Option]>, HelpText<"Place debug types in their own section (ELF Only)">;
 def fno_debug_types_section: Flag<["-"], "fno-debug-types-section">, Group<f_Group>,
@@ -2797,6 +2834,10 @@ def unwindlib_EQ : Joined<["-", "--"], "unwindlib=">, Flags<[CC1Option]>,
   HelpText<"Unwind library to use">, Values<"libgcc,unwindlib,platform">;
 def sub__library : JoinedOrSeparate<["-"], "sub_library">;
 def sub__umbrella : JoinedOrSeparate<["-"], "sub_umbrella">;
+def sva : Flag<["-", "--"], "sva">, Flags<[CC1Option]>,
+  HelpText<"Enable SVA">;
+def no_sva : Flag<["-", "--"], "no-sva">, Flags<[DriverOption]>,
+  HelpText<"Disable SVA">;
 def system_header_prefix : Joined<["--"], "system-header-prefix=">,
   Group<clang_i_Group>, Flags<[CC1Option]>, MetaVarName<"<prefix>">,
   HelpText<"Treat all #include paths starting with <prefix> as including a "

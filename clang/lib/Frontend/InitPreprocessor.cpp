@@ -1117,6 +1117,10 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     Builder.defineMacro("__GLIBCXX_BITSIZE_INT_N_0", "128");
   }
 
+  if (LangOpts.SVA) {
+    Builder.defineMacro("__SVA__");
+  }
+
   // Get other target #defines.
   TI.getTargetDefines(LangOpts, Builder);
 }

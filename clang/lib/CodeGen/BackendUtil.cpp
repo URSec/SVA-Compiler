@@ -62,6 +62,8 @@
 #include "llvm/Transforms/Instrumentation/InstrProfiling.h"
 #include "llvm/Transforms/Instrumentation/MemorySanitizer.h"
 #include "llvm/Transforms/Instrumentation/SanitizerCoverage.h"
+#include "llvm/Transforms/Instrumentation/CFI.h"
+#include "llvm/Transforms/Instrumentation/SFI.h"
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
@@ -340,6 +342,24 @@ static void addDataFlowSanitizerPass(const PassManagerBuilder &Builder,
   PM.add(createDataFlowSanitizerPass(LangOpts.SanitizerBlacklistFiles));
 }
 
+static void addSVAPasses(const PassManagerBuilder &Builder,
+                         legacy::PassManagerBase &PM) {
+  const PassManagerBuilderWrapper &BuilderWrapper =
+      static_cast<const PassManagerBuilderWrapper&>(Builder);
+  const LangOptions &LangOpts = BuilderWrapper.getLangOpts();
+
+  if (LangOpts.SVA_CFI) {
+    PM.add(createCFIPass(LangOpts.SVA_PROTECT_SVA_MEM,
+                         LangOpts.SVA_MPX,
+                         LangOpts.SVA_CET));
+  }
+  if (LangOpts.SVA_SFI) {
+    PM.add(createSFIPass(LangOpts.SVA_CHECK_LOADS,
+                         LangOpts.SVA_PROTECT_SVA_MEM,
+                         LangOpts.SVA_MPX));
+  }
+}
+
 static TargetLibraryInfoImpl *createTLII(llvm::Triple &TargetTriple,
                                          const CodeGenOptions &CodeGenOpts) {
   TargetLibraryInfoImpl *TLII = new TargetLibraryInfoImpl(TargetTriple);
@@ -482,6 +502,7 @@ static void initTargetOptions(llvm::TargetOptions &Options,
   Options.EmitAddrsig = CodeGenOpts.Addrsig;
   Options.EnableDebugEntryValues = CodeGenOpts.EnableDebugEntryValues;
   Options.ForceDwarfFrameSection = CodeGenOpts.ForceDwarfFrameSection;
+  Options.SVA = LangOpts.SVA;
 
   Options.MCOptions.SplitDwarfFile = CodeGenOpts.SplitDwarfFile;
   Options.MCOptions.MCRelaxAll = CodeGenOpts.RelaxAll;
@@ -678,6 +699,13 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
                            addDataFlowSanitizerPass);
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addDataFlowSanitizerPass);
+  }
+
+  if (LangOpts.SVA) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addSVAPasses);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addSVAPasses);
   }
 
   // Set up the per-function pass manager.
@@ -1203,6 +1231,22 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
                   UseOdrIndicator));
             });
       }
+      if (LangOpts.SVA) {
+        PB.registerOptimizerLastEPCallback(
+          [this](FunctionPassManager &FPM,
+                 PassBuilder::OptimizationLevel Level) {
+            if (LangOpts.SVA_CFI) {
+              FPM.addPass(CFI(LangOpts.SVA_PROTECT_SVA_MEM,
+                              LangOpts.SVA_MPX,
+                              LangOpts.SVA_CET));
+            }
+            if (LangOpts.SVA_SFI) {
+              FPM.addPass(SFI(LangOpts.SVA_CHECK_LOADS,
+                              LangOpts.SVA_PROTECT_SVA_MEM,
+                              LangOpts.SVA_MPX));
+            }
+          });
+      }
       if (Optional<GCOVOptions> Options = getGCOVOptions(CodeGenOpts))
         PB.registerPipelineStartEPCallback([Options](ModulePassManager &MPM) {
           MPM.addPass(GCOVProfilerPass(*Options));
@@ -1248,6 +1292,20 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
 
     if (CodeGenOpts.OptimizationLevel == 0) {
       addSanitizersAtO0(MPM, TargetTriple, LangOpts, CodeGenOpts);
+      if (LangOpts.SVA) {
+        if (LangOpts.SVA_CFI) {
+          MPM.addPass(createModuleToFunctionPassAdaptor(
+                        CFI(LangOpts.SVA_PROTECT_SVA_MEM,
+                            LangOpts.SVA_MPX,
+                            LangOpts.SVA_CET)));
+        }
+        if (LangOpts.SVA_SFI) {
+          MPM.addPass(createModuleToFunctionPassAdaptor(
+                        SFI(LangOpts.SVA_CHECK_LOADS,
+                            LangOpts.SVA_PROTECT_SVA_MEM,
+                            LangOpts.SVA_MPX)));
+        }
+      }
     }
   }
 
