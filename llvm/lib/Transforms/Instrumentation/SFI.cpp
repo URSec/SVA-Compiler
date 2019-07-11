@@ -439,9 +439,6 @@ char LegacySFI::ID = 0;
 
 using namespace llvm;
 
-static RegisterPass<LegacySFI>
-  X("sva-sfi", "Insert SFI load/store instrumentation");
-
 FunctionPass *llvm::createSFIPass() {
   return new LegacySFI();
 }

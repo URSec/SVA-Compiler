@@ -401,9 +401,6 @@ char LegacyCFI::ID = 0;
 
 using namespace llvm;
 
-static RegisterPass<LegacyCFI>
-  X("sva-cfi", "Insert CFI instrumentation");
-
 FunctionPass *llvm::createCFIPass() {
   return new LegacyCFI();
 }
