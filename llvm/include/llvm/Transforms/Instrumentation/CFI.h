@@ -14,6 +14,9 @@
 #ifndef LLVM_TRANSFORMS_INSTRUMENTATION_CFI_H
 #define LLVM_TRANSFORMS_INSTRUMENTATION_CFI_H
 
+#include <utility>
+
+#include "llvm/ADT/Optional.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstrTypes.h"
@@ -34,7 +37,7 @@ class DataLayout;
 ///
 /// Instruments indirect jumps and calls to ensure that they only go to valid
 /// targets.
-class CFI : public PassInfoMixin<CFI>, public InstVisitor<CFI> {
+class CFI : public PassInfoMixin<CFI> {
 public:
   // FIXME: These are target-specific and should be queried from the target.
 
@@ -77,6 +80,11 @@ public:
   /// @return   The analyses which were not invalidated by this pass.
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 
+  /// Run the CFI pass on the specified `Function`.
+  ///
+  /// @param F  The `Function` on which the CFI pass will be run.
+  void runOnFunction(Function &F);
+
   /// Add declarations for SVA utility functions.
   ///
   /// @param M  The module that this pass will run on.
@@ -87,20 +95,37 @@ public:
   //                            Visitor methods
   // ---------------------------------------------------------------------------
 
+  /// Add CFI instrumentation to certain `Instruction`s.
+  ///
+  /// @param CI The `Instruction` to instrument.
+  /// @return   The next `BasicBlock` and `Instruction` that should be visited,
+  ///           or `None` to continue from the current `Instruction`.
+  llvm::Optional<std::pair<BasicBlock*, BasicBlock::iterator>>
+  visit(Instruction &I);
+
   /// Add CFI instrumentation to certain function calls.
   ///
   /// @param CI The call to instrument.
-  void visitCallBase(CallBase &CI);
+  /// @return   The next `BasicBlock` and `Instruction` that should be visited,
+  ///           or `None` to continue from the current `Instruction`.
+  llvm::Optional<std::pair<BasicBlock*, BasicBlock::iterator>>
+  visitCallBase(CallBase &CI);
 
   /// Add CFI instrumentation to an indirect branch.
   ///
   /// @param BI The branch to instrument.
-  void visitIndirectBrInst(IndirectBrInst &BI);
+  /// @return   The next `BasicBlock` and `Instruction` that should be visited,
+  ///           or `None` to continue from the current `Instruction`.
+  llvm::Optional<std::pair<BasicBlock*, BasicBlock::iterator>>
+  visitIndirectBrInst(IndirectBrInst &BI);
 
   /// Add CFI instrumentation to a return.
   ///
   /// @param RI The return to instrument.
-  void visitReturnInst(ReturnInst &RI);
+  /// @return   The next `BasicBlock` and `Instruction` that should be visited,
+  ///           or `None` to continue from the current `Instruction`.
+  llvm::Optional<std::pair<BasicBlock*, BasicBlock::iterator>>
+  visitReturnInst(ReturnInst &RI);
 
 private:
   /// Determine if an indirect call is safe (and therefore does not need a
@@ -137,6 +162,16 @@ private:
   /// @return   A pointer to `abort`, casted to `Ty`.
   Value *castAbortTo(Type *Ty);
 
+  /// Returns the error basic block for this `Function`, creating it if it
+  /// doesn't exist.
+  ///
+  /// The error basic block is the basic block to which control should be
+  /// transfered in the event of a CFI check failure.
+  ///
+  /// @param F  The `Function` whose error basic block needs to be retrieved.
+  /// @return   An error basic block in `F`.
+  BasicBlock *getOrCreateErrorBasicBlock(Function& F);
+
   /// Add code to bit-mask the specified pointer and insert it before the
   /// specified instruction.
   ///
@@ -156,10 +191,14 @@ private:
   ///               required to be.
   /// @return       A value which should become the new target of the indirect
   ///               jump/call.
-  Value *addLabelCheck(Value &Callee, Instruction &I);
+  std::pair<BasicBlock*, BasicBlock::iterator>
+  addLabelCheck(Value &Callee, Instruction &I);
 
   /// The `abort` function.
   Function *Abort = nullptr;
+
+  /// The basic block that we jump to on a CFI check failure.
+  BasicBlock *ErrorBB = nullptr;
 
   /// Whether or not to perform checks to protect SVA's private memory.
   bool SVAMemChecks;

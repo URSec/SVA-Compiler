@@ -16,6 +16,10 @@
 
 #define DEBUG_TYPE "sva-cfi"
 
+#include <iterator>
+#include <tuple>
+#include <vector>
+
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CallSite.h"
@@ -28,6 +32,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Transforms/Instrumentation/CFI.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 // Pass Statistics
 namespace {
@@ -180,7 +185,8 @@ Value *CFI::addBitMasking(Value &Callee, Instruction &I) {
   }
 }
 
-Value *CFI::addLabelCheck(Value &Callee, Instruction &I) {
+std::pair<BasicBlock*, BasicBlock::iterator>
+CFI::addLabelCheck(Value &Callee, Instruction &I) {
   if (UseCET) {
     report_fatal_error("Using CET for CFI is not currently implemented");
   } else {
@@ -204,40 +210,52 @@ Value *CFI::addLabelCheck(Value &Callee, Instruction &I) {
                                   Label,
                                   TargetLabel,
                                   "label_cmp");
-    // Call `abort` instead if the target doesn't have a valid label.
-    // Changing the call target to `abort` allows us to avoid splitting basic
-    // blocks to insert conditional branches.
-    // TODO: We should actually be branching here, especially for returns.
-    Value *CastedAbort = castAbortTo(Callee.getType());
-    Value *Final = SelectInst::Create(IsValid, &Callee, CastedAbort, "fptr", &I);
+
+    BasicBlock *CurrentBB = I.getParent();
+    BasicBlock *NewBB
+      = CurrentBB->splitBasicBlock(&I, CurrentBB->getName() + ".cfi_ok");
+    BasicBlock::iterator NextInst = std::next(I.getIterator());
+
+    BasicBlock *ErrorBB = getOrCreateErrorBasicBlock(*I.getFunction());
+    BranchInst *Branch = BranchInst::Create(NewBB, ErrorBB, IsValid);
+    ReplaceInstWithInst(CurrentBB->getTerminator(), Branch);
 
     ++CJChecks;
 
-    return Final;
+    return std::make_pair(NewBB, NextInst);
   }
 }
 
-void CFI::visitIndirectBrInst(IndirectBrInst &BI) {
+llvm::Optional<std::pair<BasicBlock*, BasicBlock::iterator>>
+CFI::visitIndirectBrInst(IndirectBrInst &BI) {
   if (!isTriviallySafe(BI)) {
     Value *Target = BI.getAddress();
     assert(Target && "Indirect branch has no target");
     Value *MaskedTarget = addBitMasking(*Target, BI);
-    Value *CheckedTarget = addLabelCheck(*MaskedTarget, BI);
-    BI.setAddress(CheckedTarget);
+    auto Next = addLabelCheck(*MaskedTarget, BI);
+    BI.setAddress(MaskedTarget);
+    return Next;
+  } else {
+    return None;
   }
 }
 
-void CFI::visitCallBase(CallBase &CI) {
+llvm::Optional<std::pair<BasicBlock*, BasicBlock::iterator>>
+CFI::visitCallBase(CallBase &CI) {
   if (CI.isIndirectCall() && !isTriviallySafe(CI)) {
     Value *Callee = CI.getCalledOperand();
     assert(Callee && "Call instruction has no callee");
     Value *MaskedCallee = addBitMasking(*Callee, CI);
-    Value *CheckedCallee = addLabelCheck(*MaskedCallee, CI);
-    CI.setCalledOperand(CheckedCallee);
+    auto Next = addLabelCheck(*MaskedCallee, CI);
+    CI.setCalledOperand(MaskedCallee);
+    return Next;
+  } else {
+    return None;
   }
 }
 
-void CFI::visitReturnInst(ReturnInst &RI) {
+llvm::Optional<std::pair<BasicBlock*, BasicBlock::iterator>>
+CFI::visitReturnInst(ReturnInst &RI) {
   LLVMContext& Ctx = RI.getContext();
   const DataLayout& DL = RI.getModule()->getDataLayout();
 
@@ -257,18 +275,72 @@ void CFI::visitReturnInst(ReturnInst &RI) {
                                          "retaddrasptr",
                                          &RI);
   Value *MaskedReturn = addBitMasking(*RetAddrAsPtr, RI);
-  Value *CheckedReturn = addLabelCheck(*MaskedReturn, RI);
+  auto Next = addLabelCheck(*MaskedReturn, RI);
 
   // See FIXME above
-  Value *CastedCheckedReturn = new PtrToIntInst(CheckedReturn,
-                                                RetAddrTy,
-                                                "checkedretaddr",
-                                                &RI);
+  Value *CastedMaskedReturn = new PtrToIntInst(MaskedReturn,
+                                               RetAddrTy,
+                                               "checkedretaddr",
+                                               &RI);
 
-  // This is really screwy: We set the return address to "return" to `abort`
-  // if the label check fails.
-  // TODO: Actually branch if the check fails.
-  new StoreInst(CastedCheckedReturn, AddrOfRetAddr, &RI);
+  new StoreInst(CastedMaskedReturn, AddrOfRetAddr, &RI);
+
+  return Next;
+}
+
+llvm::Optional<std::pair<BasicBlock*, BasicBlock::iterator>>
+CFI::visit(Instruction &I) {
+  if (CallBase* CI = dyn_cast<CallBase>(&I)) {
+    return visitCallBase(*CI);
+  } else if (IndirectBrInst* BI = dyn_cast<IndirectBrInst>(&I)) {
+    return visitIndirectBrInst(*BI);
+  } else if (ReturnInst* RI = dyn_cast<ReturnInst>(&I)) {
+    return visitReturnInst(*RI);
+  } else {
+    return None;
+  }
+}
+
+BasicBlock *CFI::getOrCreateErrorBasicBlock(Function& F) {
+  if (ErrorBB == nullptr) {
+    ErrorBB = BasicBlock::Create(F.getContext(), "cfi_check_fail", &F);
+    CallInst::Create(Abort, "", ErrorBB);
+    new UnreachableInst(F.getContext(), ErrorBB);
+  } else {
+    assert(ErrorBB->getParent() == &F && "Error basic block is stale");
+  }
+
+  return ErrorBB;
+}
+
+void CFI::runOnFunction(Function &F) {
+  ErrorBB = nullptr;
+
+  // Because we may be inserting basic blocks, we cannot simply iterate over
+  // each basic block in the function. Instead, we create a work list with all
+  // of the function's basic blocks. Each time we create a basic block, we add
+  // it to the work list. To further complicate things, when we split a block,
+  // the first instruction in the new block is one we already visited.
+  // Therefore, the work list also contains an iterator into the basic block to
+  // indicate where in that block we should begin visiting.
+  std::vector<std::pair<BasicBlock*, BasicBlock::iterator>> Worklist;
+
+  for (BasicBlock &BB : F) {
+    Worklist.push_back(std::make_pair(&BB, BB.begin()));
+  }
+
+  while (!Worklist.empty()) {
+    BasicBlock *BB;
+    BasicBlock::iterator Start;
+    std::tie(BB, Start) = Worklist.back();
+    Worklist.pop_back();
+    for (Instruction &I : make_range(Start, BB->end())) {
+      if (auto NewBlock = visit(I)) {
+        Worklist.push_back(*NewBlock);
+        break; // We invalidated the iterator, so we have to exit the loop here.
+      }
+    }
+  }
 }
 
 bool CFI::doInitialization(Module &M) {
@@ -287,9 +359,9 @@ PreservedAnalyses CFI::run(Function &F, FunctionAnalysisManager &AM) {
   doInitialization(*F.getParent());
 
   // Visit all of the instructions in the function.
-  visit(F);
+  runOnFunction(F);
 
-  return PreservedAnalyses::allInSet<CFGAnalyses>();
+  return PreservedAnalyses::none();
 }
 }
 
@@ -308,7 +380,7 @@ public:
     // `abort` seems to get deleted from the module if we add it any earlier.
     CFIPass.doInitialization(*F.getParent());
 
-    CFIPass.visit(F);
+    CFIPass.runOnFunction(F);
     return true;
   }
 
@@ -317,8 +389,7 @@ public:
   }
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const override {
-    // Preserve the CFG
-    AU.setPreservesCFG();
+    // NOOP: No preserved analyses, no required analyses
   }
 
 private:
