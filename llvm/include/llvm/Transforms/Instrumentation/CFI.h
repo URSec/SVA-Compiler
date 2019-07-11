@@ -74,9 +74,9 @@ public:
   explicit CFI(bool SVAMemChecks, bool UseMPX, bool UseCET)
     : SVAMemChecks(SVAMemChecks), UseMPX(UseMPX), UseCET(UseCET) { }
 
-  /// Run the CFI pass on the specified function.
+  /// Run the CFI pass on the specified `Function`.
   ///
-  /// @param F  The function on which the CFI pass will be run.
+  /// @param F  The `Function` on which the CFI pass will be run.
   /// @return   The analyses which were not invalidated by this pass.
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 
