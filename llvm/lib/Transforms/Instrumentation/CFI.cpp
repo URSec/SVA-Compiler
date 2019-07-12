@@ -195,6 +195,9 @@ CFI::addLabelCheck(Value &Callee, Instruction &I) {
     LLVMContext &Ctx = M.getContext();
 
     Type *LabelTy = DL.getSmallestLegalIntType(Ctx, CFILabelSize * 8);
+    if (!LabelTy) {
+      report_fatal_error("Colud not get type for CFI label");
+    }
     Type *LabelPtrTy
       = LabelTy->getPointerTo(Callee.getType()->getPointerAddressSpace());
 
