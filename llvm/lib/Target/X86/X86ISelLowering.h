@@ -560,6 +560,11 @@ namespace llvm {
       // value for ECX.
       RDPKRU, WRPKRU,
 
+      // MPX bounds check
+      // Operand 0 is chain. Operand 1 is bounds register. Operand 2 is pointer
+      // value.
+      MPX_BNDCL, MPX_BNDCU, MPX_BNDCN,
+
       // SSE42 string comparisons.
       // These nodes produce 3 results, index, mask, and flags. X86ISelDAGToDAG
       // will emit one or two instructions based on which results are used. If

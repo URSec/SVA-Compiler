@@ -24886,6 +24886,56 @@ static SDValue LowerINTRINSIC_W_CHAIN(SDValue Op, const X86Subtarget &Subtarget,
       return DAG.getNode(ISD::MERGE_VALUES, dl, Op->getVTList(), SetCC,
                          Operation.getValue(1));
     }
+    case Intrinsic::x86_bndcl:
+    case Intrinsic::x86_bndcu:
+    case Intrinsic::x86_bndcn: {
+      SDLoc dl(Op);
+      unsigned Opc;
+      switch (IntNo) {
+      case Intrinsic::x86_bndcl:
+        Opc = X86ISD::MPX_BNDCL;
+        break;
+      case Intrinsic::x86_bndcu:
+        Opc = X86ISD::MPX_BNDCU;
+        break;
+      case Intrinsic::x86_bndcn:
+        Opc = X86ISD::MPX_BNDCN;
+        break;
+      default:
+        llvm_unreachable("Bad intrinsic");
+      }
+
+      SDValue Chain = Op.getOperand(0);
+      SDValue Ptr = Op.getOperand(2);
+      SDValue BndRegIdxVal = Op.getOperand(3);
+      unsigned int BndRegIdx;
+      if (auto BndRegIdxNode = dyn_cast<ConstantSDNode>(BndRegIdxVal)) {
+        uint64_t BndRegHWIdx = BndRegIdxNode->getZExtValue();
+        switch (BndRegHWIdx) {
+        case 0:
+          BndRegIdx = X86::BND0;
+          break;
+        case 1:
+          BndRegIdx = X86::BND1;
+          break;
+        case 2:
+          BndRegIdx = X86::BND2;
+          break;
+        case 3:
+          BndRegIdx = X86::BND3;
+          break;
+        default:
+          report_fatal_error("Register argument to MPX bounds check intrinsics "
+            "must be a valid bounds register index");
+        }
+      } else {
+        report_fatal_error("Register argument to MPX bounds check intrinsics "
+        "must be a constant integer");
+      }
+      SDValue BndReg = DAG.getRegister(BndRegIdx, MVT::v2i64);
+
+      return DAG.getNode(Opc, dl, MVT::Other, Chain, BndReg, Ptr);
+    }
     }
     return SDValue();
   }
@@ -29951,6 +30001,9 @@ const char *X86TargetLowering::getTargetNodeName(unsigned Opcode) const {
   case X86ISD::ENQCMD:             return "X86ISD:ENQCMD";
   case X86ISD::ENQCMDS:            return "X86ISD:ENQCMDS";
   case X86ISD::VP2INTERSECT:       return "X86ISD::VP2INTERSECT";
+  case X86ISD::MPX_BNDCL:          return "X86ISD::MPX_BNDCL";
+  case X86ISD::MPX_BNDCU:          return "X86ISD::MPX_BNDCU";
+  case X86ISD::MPX_BNDCN:          return "X86ISD::MPX_BNDCN";
   }
   return nullptr;
 }

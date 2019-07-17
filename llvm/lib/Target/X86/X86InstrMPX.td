@@ -75,3 +75,21 @@ let mayLoad = 1 in
 def BNDLDXrm:      I<0x1A, MRMSrcMem, (outs BNDR:$dst), (ins anymem:$src),
                     "bndldx\t{$src, $dst|$dst, $src}", []>, PS;
 } // SchedRW
+
+let Predicates = [Not64BitMode] in {
+def : Pat<(X86bndcl BNDR:$bnd, GR32:$ptr),
+          (BNDCL32rr BNDR:$bnd, GR32:$ptr)>;
+def : Pat<(X86bndcu BNDR:$bnd, GR32:$ptr),
+          (BNDCU32rr BNDR:$bnd, GR32:$ptr)>;
+def : Pat<(X86bndcn BNDR:$bnd, GR32:$ptr),
+          (BNDCN32rr BNDR:$bnd, GR32:$ptr)>;
+}
+
+let Predicates = [In64BitMode] in {
+def : Pat<(X86bndcl BNDR:$bnd, GR64:$ptr),
+          (BNDCL64rr BNDR:$bnd, GR64:$ptr)>;
+def : Pat<(X86bndcu BNDR:$bnd, GR64:$ptr),
+          (BNDCU64rr BNDR:$bnd, GR64:$ptr)>;
+def : Pat<(X86bndcn BNDR:$bnd, GR64:$ptr),
+          (BNDCN64rr BNDR:$bnd, GR64:$ptr)>;
+}

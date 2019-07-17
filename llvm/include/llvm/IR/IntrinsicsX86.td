@@ -2517,6 +2517,57 @@ let TargetPrefix = "x86" in {  // All intrinsics start with "llvm.x86.".
 }
 
 //===----------------------------------------------------------------------===//
+// MPX
+let TargetPrefix = "x86" in {  // All intrinsics start with "llvm.x86.".
+  // ---------------------------------------------------------------------------
+  // Bounds check intrinsics
+  // ---------------------------------------------------------------------------
+
+  // FIXME: These intrinsics could be marked as not accessing memory, but doing
+  // so currently causes the code generator to not give them a chain when
+  // building the selection DAG.
+
+  /// Check that the pointer is not below the lower bound in the bound register.
+  ///
+  /// Faults if the pointer is below the lower bound set in the bound
+  /// register.
+  ///
+  /// @param ptr    The pointer to check.
+  /// @param bndreg The bound register to use.
+  /// @throws #BR   If `ptr` < `bndreg.lb`, i.e. if the pointer is below the
+  ///               bound register's lower bound.
+  def int_x86_bndcl : Intrinsic<[], [llvm_ptr_ty, llvm_i32_ty],
+                                [NoCapture<0>, ImmArg<1>]>;
+
+  /// Check that the pointer is not above the upper bound in the bound register.
+  ///
+  /// Faults if the pointer is above the upper bound set in the bound
+  /// register.
+  ///
+  /// @param ptr    The pointer to check.
+  /// @param bndreg The bound register to use.
+  /// @throws #BR   If `ptr` > `~bndreg.ub`, i.e. if the pointer is above the
+  ///               bound register's upper bound.
+  def int_x86_bndcu : Intrinsic<[], [llvm_ptr_ty, llvm_i32_ty],
+                                [NoCapture<0>, ImmArg<1>]>;
+
+  /// Check that the pointer is not above the upper bound in the bound register.
+  ///
+  /// Faults if the pointer is above the upper bound set in the bound
+  /// register.
+  ///
+  /// This intrinsic does not perform a ones' complement operation on the upper
+  /// bound before performing the check.
+  ///
+  /// @param ptr    The pointer to check.
+  /// @param bndreg The bound register to use.
+  /// @throws #BR   If `ptr` > `bndreg.ub`, i.e. if the pointer is above the
+  ///               bound register's upper bound.
+  def int_x86_bndcn : Intrinsic<[], [llvm_ptr_ty, llvm_i32_ty],
+                                [NoCapture<0>, ImmArg<1>]>;
+}
+
+//===----------------------------------------------------------------------===//
 // Support protection key
 let TargetPrefix = "x86" in {  // All intrinsics start with "llvm.x86.".
   def int_x86_rdpkru : GCCBuiltin <"__builtin_ia32_rdpkru">,
