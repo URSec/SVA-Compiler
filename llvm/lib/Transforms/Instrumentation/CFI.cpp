@@ -28,6 +28,7 @@
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/IntrinsicsX86.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Format.h"
@@ -53,7 +54,7 @@ OptUseMPX("enable-mpx-cfi",
 
 namespace llvm {
 
-CFI::CFI() : CFI(DoSVAChecks, false, false) { }
+CFI::CFI() : CFI(DoSVAChecks, OptUseMPX, false) { }
 
 // FIXME:
 //  Performing this check here really breaks the separation of concerns design
@@ -87,49 +88,22 @@ Value *CFI::addBitMasking(Value &Callee, Instruction &I) {
   Type *IntPtrTy = DL.getIntPtrType(I.getContext());
 
   if (UseMPX) {
-    report_fatal_error("Using MPX for CFI is not currently implemented");
-
-#if 0
     /// A reference to the context to the LLVM module which this code is
     /// transforming.
-    LLVMContext &Context = I.getContext();
+    LLVMContext &Ctx = I.getContext();
 
-    // Create a pointer value that is the pointer minus the start of the
-    // secure memory.
-    Constant *adjSize = ConstantInt::get(IntPtrTy,
-                                         startGhostMemory,
-                                         false);
-    Value *IntPtr = new PtrToIntInst(&Callee,
-                                     IntPtrTy,
-                                     Callee.getName(),
-                                     &I);
-    Value *AdjustPtr = BinaryOperator::Create(Instruction::Sub,
-                                              IntPtr,
-                                              adjSize,
-                                              "adjSize",
-                                              &I);
-    AdjustPtr = new IntToPtrInst(AdjustPtr,
-                                 Callee.getType(),
-                                 Callee.getName(),
-                                 &I);
-
-    // Create a function type for the inline assembly instruction.
-    FunctionType *CheckType;
-    CheckType = FunctionType::get(Type::getVoidTy(Context),
-                                  Callee.getType(),
-                                  false);
-
-    // Create an inline assembly "value" that will perform the bounds check.
-    Value *LowerBoundsCheck = InlineAsm::get(CheckType,
-                                             "bndcl $0, %bnd0\n",
-                                             "r,~{dirflag},~{fpsr},~{flags}",
-                                             true);
-
-    // Create the lower bounds check.  Do this before calculating the address
-    // for the upper bounds check; this might reduce register pressure.
-    CallInst::Create(LowerBoundsCheck, AdjustPtr, "", &I);
-    return Callee;
-#endif
+    Value *CastedCallee = new BitCastInst(&Callee,
+                                          Type::getInt8PtrTy(Ctx),
+                                          Callee.getName(),
+                                          &I);
+    Function *BoundsCheckLowerIntrin
+      = Intrinsic::getDeclaration(I.getModule(), Intrinsic::x86_bndcl);
+    Value *BoundsReg = ConstantInt::get(Type::getInt32Ty(Ctx), 1);
+    CallInst::Create(BoundsCheckLowerIntrin,
+                     {CastedCallee, BoundsReg},
+                     "",
+                     &I);
+    return &Callee;
   } else {
     // Create the integer values used for bit-masking.
     Value *Mask = ConstantInt::get(IntPtrTy, KernelAddrSpaceMask);
