@@ -26,8 +26,11 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/IntrinsicsX86.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
@@ -126,7 +129,7 @@ Value &SFI::addBitMasking(Value &Pointer, Instruction &I) {
   if (UseMPX) {
     /// A reference to the context to the LLVM module which this code is
     /// transforming.
-    LLVMContext &Context = I.getContext();
+    LLVMContext &Ctx = I.getContext();
 
     // Create a pointer value that is the pointer minus the start of the
     // secure memory.
@@ -143,25 +146,16 @@ Value &SFI::addBitMasking(Value &Pointer, Instruction &I) {
                                               "adjSize",
                                               &I);
     AdjustPtr = new IntToPtrInst(AdjustPtr,
-                                 Pointer.getType(),
+                                 Type::getInt8PtrTy(Ctx),
                                  Pointer.getName(),
                                  &I);
-
-    // Create a function type for the inline assembly instruction.
-    FunctionType *CheckType;
-    CheckType = FunctionType::get(Type::getVoidTy(Context),
-                                  Pointer.getType(),
-                                  false);
-
-    // Create an inline assembly "value" that will perform the bounds check.
-    Value *LowerBoundsCheck = InlineAsm::get(CheckType,
-                                             "bndcl $0, %bnd0\n",
-                                             "r,~{dirflag},~{fpsr},~{flags}",
-                                             true);
-
-    // Create the lower bounds check.  Do this before calculating the address
-    // for the upper bounds check; this might reduce register pressure.
-    CallInst::Create(LowerBoundsCheck, AdjustPtr, "", &I);
+    Function *BoundsCheckLowerIntrin
+      = Intrinsic::getDeclaration(I.getModule(), Intrinsic::x86_bndcl);
+    Value *BoundsReg = ConstantInt::get(Type::getInt32Ty(Ctx), 0);
+    CallInst::Create(BoundsCheckLowerIntrin,
+                     {AdjustPtr, BoundsReg},
+                     "",
+                     &I);
     return Pointer;
   } else {
     // Create the integer values used for bit-masking.
