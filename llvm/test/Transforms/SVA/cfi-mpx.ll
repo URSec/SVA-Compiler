@@ -56,8 +56,6 @@ define void @test_return_void() nounwind {
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[TYPE_ERASED_PTR]], i32 1)
 ; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -762721911, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
-; CHECK: %[[RET_ADDR:[[:alnum:]_.]+]] = ptrtoint i8* %[[PTR]] to i64
-; CHECK: store i64 %[[RET_ADDR]], i64* %{{[[:alnum:]_.]+}}
 ; CHECK: ret void
     ret void
 
@@ -73,8 +71,6 @@ define i32 @test_return_value() nounwind {
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[TYPE_ERASED_PTR]], i32 1)
 ; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -762721911, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
-; CHECK: %[[RET_ADDR:[[:alnum:]_.]+]] = ptrtoint i8* %[[PTR]] to i64
-; CHECK: store i64 %[[RET_ADDR]], i64* %{{[[:alnum:]_.]+}}
 ; CHECK: ret i32 0
     ret i32 0
 

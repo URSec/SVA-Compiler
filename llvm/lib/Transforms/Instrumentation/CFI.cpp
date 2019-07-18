@@ -254,13 +254,19 @@ CFI::visitReturnInst(ReturnInst &RI) {
   Value *MaskedReturn = addBitMasking(*RetAddrAsPtr, RI);
   auto Next = addLabelCheck(*MaskedReturn, RI);
 
-  // See FIXME above
-  Value *CastedMaskedReturn = new PtrToIntInst(MaskedReturn,
-                                               RetAddrTy,
-                                               "checkedretaddr",
-                                               &RI);
+  // If we are using MPX, then we will trap on a bad return address instead of
+  // needing to mask and overwrite it, and we will therefore store the same
+  // value that we read.
+  // FIXME: We should probably rely on dead store elimination for this
+  if (!UseMPX) {
+    // See FIXME above about casting return address to pointer
+    Value *CastedMaskedReturn = new PtrToIntInst(MaskedReturn,
+                                                 RetAddrTy,
+                                                 "checkedretaddr",
+                                                 &RI);
 
-  new StoreInst(CastedMaskedReturn, AddrOfRetAddr, &RI);
+    new StoreInst(CastedMaskedReturn, AddrOfRetAddr, &RI);
+  }
 
   return Next;
 }
