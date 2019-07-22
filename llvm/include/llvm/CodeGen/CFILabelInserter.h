@@ -45,6 +45,12 @@ public:
   virtual void getAnalysisUsage(AnalysisUsage &AU) const override;
 
 private:
+  /// Determine if a machine function needs a CFI label.
+  ///
+  /// @param MBB  The machine function to check.
+  /// @return     True if `MF` needs a CFI label, otherwise false.
+  bool needsLabel(const MachineFunction &MBB) const;
+
   /// Determine if a machine basic block needs a CFI label.
   ///
   /// @param MBB  The machine basic block to check.

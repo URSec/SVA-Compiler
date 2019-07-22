@@ -31,6 +31,11 @@ void CFILabelInserter::addLabel(MachineBasicBlock &MBB,
   TII->expandPostRAPseudo(*MIB.getInstr());
 }
 
+bool CFILabelInserter::needsLabel(const MachineFunction &MF) const {
+  const Function& F = MF.getFunction();
+  return !F.hasLocalLinkage() || F.hasAddressTaken();
+}
+
 bool CFILabelInserter::needsLabel(const MachineBasicBlock &MBB) const {
   // TODO: Whether or not we need to put labels on exception landing pads
   // depends on whether or not we trust the exception handling library.
@@ -50,7 +55,7 @@ bool CFILabelInserter::runOnMachineFunction(MachineFunction &MF) {
   bool Changed = false;
 
   for (MachineBasicBlock &MBB : MF) {
-    if (needsLabel(MBB)) {
+    if (needsLabel(MBB) || (&MBB == &MF.front() && needsLabel(MF))) {
       // Use "unknown" as the debug location for function and block labels.
       DebugLoc dl{};
       addLabel(MBB, MBB.begin(), dl);
