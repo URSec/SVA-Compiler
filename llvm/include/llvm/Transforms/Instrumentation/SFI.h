@@ -96,11 +96,6 @@ public:
   /// @param AI The atomic read-modify-write instruction to instrument.
   void visitAtomicRMWInst(AtomicRMWInst &I);
 
-  /// Add SFI instrumentation to certain function calls.
-  ///
-  /// @param CI The call to instrument.
-  void visitCallBase(CallBase &CI);
-
   /// Add SFI instrumentation to a `memcpy` or `memmove` intrinsic.
   ///
   /// @param MCI  The `memcpy` or `memmove` intrinsic to instrument.

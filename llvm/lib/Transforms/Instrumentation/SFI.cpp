@@ -273,23 +273,6 @@ void SFI::visitAnyMemSetInst(AnyMemSetInst &MSI) {
   instrumentMemoryIntrinsic(Dst, nullptr, Len, MSI);
 }
 
-void SFI::visitCallBase(CallBase &CI) {
-  assert(!isa<MemCpyInst>(&CI) &&
-    "MemCpyInst should have been dispatched to its own visitor");
-
-  // Check if this function call is a non-intrinsic call to `memcpy`. This may
-  // occur, for example, due to `-fno-builtin`.
-  if (Function *F = CI.getCalledFunction()) {
-    if (F->hasName() && F->getName().equals("memcpy")) {
-      CallSite CS(&CI);
-      instrumentMemoryIntrinsic(*CS.getArgument(0),
-                                CS.getArgument(1),
-                                *CS.getArgument(2),
-                                CI);
-    }
-  }
-}
-
 void SFI::visitLoadInst(LoadInst &LI) {
   // Add a check to the load if the option for instrumenting loads is enabled.
   if (LoadChecks) {
