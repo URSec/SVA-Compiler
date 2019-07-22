@@ -101,10 +101,15 @@ public:
   /// @param CI The call to instrument.
   void visitCallBase(CallBase &CI);
 
-  /// Add SFI instrumentation to a `memcpy` intrinsic.
+  /// Add SFI instrumentation to a `memcpy` or `memmove` intrinsic.
   ///
-  /// @param MCI  The `memcpy` intrinsic to instrument.
-  void visitMemCpyInst(MemCpyInst &MCI);
+  /// @param MCI  The `memcpy` or `memmove` intrinsic to instrument.
+  void visitAnyMemTransferInst(AnyMemTransferInst &MTI);
+
+  /// Add SFI instrumentation to a `memset` intrinsic.
+  ///
+  /// @param MCI  The `memset` intrinsic to instrument.
+  void visitAnyMemSetInst(AnyMemSetInst &MTI);
 
 private:
   /// Determine if a memory access of the specified type is safe (and therefore
@@ -125,13 +130,14 @@ private:
   /// @return             The `Value` which results from bit-masking `Pointer`.
   Value &addBitMasking(Value &Pointer, Instruction &I);
 
-  /// Add SFI instrumentation to a `memcpy` operation.
+  /// Add SFI instrumentation to a `memcpy`, `memmove`, or `memset` operation.
   ///
-  /// @param Dst          The destination pointer.
-  /// @param Src          The source pointer.
-  /// @param Len          The length of the copy.
-  /// @param Instruction  The `memcpy` instruction.
-  void instrumentMemcpy(Value &D, Value &S, Value &L, Instruction &I);
+  /// @param Dst  The destination pointer.
+  /// @param Src  The source pointer, or null if the intrinsic doesn't read
+  ///             memory (e.g. memset).
+  /// @param Len  The length of the operation.
+  /// @param I    The `memcpy`, `memmove`, or `memset` instruction.
+  void instrumentMemoryIntrinsic(Value &Dst, Value *Src, Value &Len, Instruction &I);
 
   /// Whether or not to do checks on load instructions.
   bool LoadChecks;

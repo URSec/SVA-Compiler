@@ -227,22 +227,19 @@ Value &SFI::addBitMasking(Value &Pointer, Instruction &I) {
   }
 }
 
-void SFI::instrumentMemcpy(Value &Dst, Value &Src, Value &Len, Instruction &I) {
-  return;
+void SFI::instrumentMemoryIntrinsic(Value &Dst,
+                                    Value *Src,
+                                    Value &Len,
+                                    Instruction &I) {
   // Cast the pointers to integers.  Only cast the source pointer if we're
   // adding SFI checks to loads.
   const DataLayout &DL = I.getModule()->getDataLayout();
   Type *IntPtrTy = DL.getIntPtrType(I.getContext());
   Value *DstInt = new PtrToIntInst(&Dst, IntPtrTy, "dst", &I);
   Value *SrcInt = nullptr;
-  if (LoadChecks) {
-    SrcInt = new PtrToIntInst(&Src, IntPtrTy, "src", &I);
+  if (LoadChecks && Src != nullptr) {
+    SrcInt = new PtrToIntInst(Src, IntPtrTy, "src", &I);
   }
-
-  // Setup the function arguments.
-  Value *Args[2];
-  Args[0] = DstInt;
-  Args[1] = &Len;
 
   // Get the function.
   Module *M = I.getModule();
@@ -250,25 +247,30 @@ void SFI::instrumentMemcpy(Value &Dst, Value &Src, Value &Len, Instruction &I) {
   assert(CheckF && "sva_check_buffer not found!\n");
 
   // Create a call to the checking function.
-  CallInst::Create(CheckF, Args, "", &I);
+  CallInst::Create(CheckF, {DstInt, &Len}, "", &I);
 
   // Create another call to check the source if SFI checks on loads have been
   // enabled.
-  if (LoadChecks) {
-    Value *SrcArgs[2];
-    SrcArgs[0] = SrcInt;
-    SrcArgs[1] = &Len;
-    CallInst::Create(CheckF, SrcArgs, "", &I);
+  if (LoadChecks && Src != nullptr) {
+    CallInst::Create(CheckF, {SrcInt, &Len}, "", &I);
   }
 }
 
-void SFI::visitMemCpyInst(MemCpyInst &MCI) {
+void SFI::visitAnyMemTransferInst(AnyMemTransferInst &MTI) {
   // Get the arguments to the `memcpy`.
-  Value &Dst = *MCI.getDest();
-  Value &Src = *MCI.getSource();
-  Value &Len = *MCI.getLength();
+  Value &Dst = *MTI.getDest();
+  Value &Src = *MTI.getSource();
+  Value &Len = *MTI.getLength();
 
-  instrumentMemcpy(Dst, Src, Len, MCI);
+  instrumentMemoryIntrinsic(Dst, &Src, Len, MTI);
+}
+
+void SFI::visitAnyMemSetInst(AnyMemSetInst &MSI) {
+  // Get the arguments to the `memset`.
+  Value &Dst = *MSI.getDest();
+  Value &Len = *MSI.getLength();
+
+  instrumentMemoryIntrinsic(Dst, nullptr, Len, MSI);
 }
 
 void SFI::visitCallBase(CallBase &CI) {
@@ -280,10 +282,10 @@ void SFI::visitCallBase(CallBase &CI) {
   if (Function *F = CI.getCalledFunction()) {
     if (F->hasName() && F->getName().equals("memcpy")) {
       CallSite CS(&CI);
-      instrumentMemcpy(*CS.getArgument(0),
-                       *CS.getArgument(1),
-                       *CS.getArgument(2),
-                       CI);
+      instrumentMemoryIntrinsic(*CS.getArgument(0),
+                                CS.getArgument(1),
+                                *CS.getArgument(2),
+                                CI);
     }
   }
 }

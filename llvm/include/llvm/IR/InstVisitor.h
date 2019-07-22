@@ -208,15 +208,53 @@ public:
                                                   { DELEGATE(DbgInfoIntrinsic);}
   RetTy visitDbgLabelInst(DbgLabelInst &I)        { DELEGATE(DbgInfoIntrinsic);}
   RetTy visitDbgInfoIntrinsic(DbgInfoIntrinsic &I){ DELEGATE(IntrinsicInst); }
+  RetTy visitAnyMemSetInst(AnyMemSetInst &I)      { DELEGATE(AnyMemIntrinsic); }
+  RetTy visitAnyMemCpyInst(AnyMemCpyInst &I)      { DELEGATE(AnyMemTransferInst); }
+  RetTy visitAnyMemMoveInst(AnyMemMoveInst &I)    { DELEGATE(AnyMemTransferInst); }
+  RetTy visitAnyMemTransferInst(AnyMemTransferInst &I) { DELEGATE(AnyMemIntrinsic); }
+  RetTy visitAnyMemIntrinsic(AnyMemIntrinsic &I)  { DELEGATE(IntrinsicInst); }
+  RetTy visitAtomicMemSetInst(AtomicMemSetInst &I)   { DELEGATE(AtomicMemIntrinsic); }
+  RetTy visitAtomicMemCpyInst(AtomicMemCpyInst &I)   { DELEGATE(AtomicMemTransferInst); }
+  RetTy visitAtomicMemMoveInst(AtomicMemMoveInst &I) { DELEGATE(AtomicMemTransferInst); }
+  RetTy visitAtomicMemTransferInst(AtomicMemTransferInst &I) { DELEGATE(AtomicMemIntrinsic); }
   RetTy visitMemSetInst(MemSetInst &I)            { DELEGATE(MemIntrinsic); }
   RetTy visitMemCpyInst(MemCpyInst &I)            { DELEGATE(MemTransferInst); }
   RetTy visitMemMoveInst(MemMoveInst &I)          { DELEGATE(MemTransferInst); }
   RetTy visitMemTransferInst(MemTransferInst &I)  { DELEGATE(MemIntrinsic); }
-  RetTy visitMemIntrinsic(MemIntrinsic &I)        { DELEGATE(IntrinsicInst); }
   RetTy visitVAStartInst(VAStartInst &I)          { DELEGATE(IntrinsicInst); }
   RetTy visitVAEndInst(VAEndInst &I)              { DELEGATE(IntrinsicInst); }
   RetTy visitVACopyInst(VACopyInst &I)            { DELEGATE(IntrinsicInst); }
   RetTy visitIntrinsicInst(IntrinsicInst &I)      { DELEGATE(CallInst); }
+
+  RetTy visitMemIntrinsic(MemIntrinsic &I) {
+    switch (I.getIntrinsicID()) {
+    case Intrinsic::memcpy:
+      return static_cast<SubClass*>(this)->
+        visitAnyMemCpyInst(cast<AnyMemCpyInst>(I));
+    case Intrinsic::memmove:
+      return static_cast<SubClass*>(this)->
+        visitAnyMemMoveInst(cast<AnyMemMoveInst>(I));
+    case Intrinsic::memset:
+      return static_cast<SubClass*>(this)->
+        visitAnyMemSetInst(cast<AnyMemSetInst>(I));
+    default: llvm_unreachable("Unknown mem intrinsic");
+    }
+  }
+
+  RetTy visitAtomicMemIntrinsic(AtomicMemIntrinsic &I) {
+    switch (I.getIntrinsicID()) {
+    case Intrinsic::memcpy_element_unordered_atomic:
+      return static_cast<SubClass*>(this)->
+        visitAnyMemCpyInst(cast<AnyMemCpyInst>(I));
+    case Intrinsic::memmove_element_unordered_atomic:
+      return static_cast<SubClass*>(this)->
+        visitAnyMemMoveInst(cast<AnyMemMoveInst>(I));
+    case Intrinsic::memset_element_unordered_atomic:
+      return static_cast<SubClass*>(this)->
+        visitAnyMemSetInst(cast<AnyMemSetInst>(I));
+    default: llvm_unreachable("Unknown atomic mem intrinsic");
+    }
+  }
 
   // Call, Invoke and CallBr are slightly different as they delegate first
   // through a generic CallSite visitor.
@@ -310,6 +348,9 @@ private:
       case Intrinsic::memcpy:      DELEGATE(MemCpyInst);
       case Intrinsic::memmove:     DELEGATE(MemMoveInst);
       case Intrinsic::memset:      DELEGATE(MemSetInst);
+      case Intrinsic::memcpy_element_unordered_atomic:  DELEGATE(AtomicMemCpyInst);
+      case Intrinsic::memmove_element_unordered_atomic: DELEGATE(AtomicMemMoveInst);
+      case Intrinsic::memset_element_unordered_atomic:  DELEGATE(AtomicMemSetInst);
       case Intrinsic::vastart:     DELEGATE(VAStartInst);
       case Intrinsic::vaend:       DELEGATE(VAEndInst);
       case Intrinsic::vacopy:      DELEGATE(VACopyInst);
