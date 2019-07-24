@@ -378,6 +378,15 @@ public:
   /// Set alignment of the basic block.
   void setAlignment(Align A) { Alignment = A; }
 
+  /// Ensure the basic block's alignment is at least `Alignment`.
+  ///
+  /// @param Align  The minimum alignment for this block.
+  void ensureAlignment(Align Alignment) {
+    if (getAlignment() < Alignment) {
+      setAlignment(Alignment);
+    }
+  }
+
   /// Returns true if the block is a landing pad. That is this basic block is
   /// entered via an exception handler.
   bool isEHPad() const { return IsEHPad; }

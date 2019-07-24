@@ -59,6 +59,10 @@ bool CFILabelInserter::runOnMachineFunction(MachineFunction &MF) {
       // Use "unknown" as the debug location for function and block labels.
       DebugLoc dl{};
       addLabel(MBB, MBB.begin(), dl);
+      // Block labels need to be aligned
+      // TODO: Get the alignment from the target
+      MBB.ensureAlignment(Align(32));
+
       Changed = true;
     }
     for (MachineInstr &MI : MBB) {

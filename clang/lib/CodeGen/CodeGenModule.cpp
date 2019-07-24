@@ -1637,6 +1637,14 @@ void CodeGenModule::SetLLVMFunctionAttributesForDefinition(const Decl *D,
     }
   }
 
+  // SVA requires function alignment for CFI
+  if (LangOpts.SVA) {
+    // TODO: Alignment amount should be target-specific
+    if (F->getAlignment() < 32) {
+      F->setAlignment(32);
+    }
+  }
+
   // Emit type metadata on member functions for member function pointer checks.
   // These are only ever necessary on definitions; we're guaranteed that the
   // definition will be present in the LTO unit as a result of LTO visibility.
