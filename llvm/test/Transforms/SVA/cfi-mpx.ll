@@ -9,6 +9,10 @@
 target datalayout = "e-m:e-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-p:64:64:64-n8:16:32:64"
 target triple = "x86_64-unknown-linux-gnu"
 
+declare void()* @make_fn_ptr() nounwind
+
+declare i8* @make_ptr() nounwind
+
 define void @test_call() nounwind noreturn {
 ; CHECK-LABEL: @test_call
 
@@ -18,7 +22,7 @@ define void @test_call() nounwind noreturn {
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
 ; CHECK: call void %[[PTR]]
 ; CHECK-NEXT: unreachable
-    %1 = inttoptr i64 0 to void()*
+    %1 = call void()* @make_fn_ptr() nounwind
     call void %1() nounwind noreturn
     unreachable
 
@@ -35,7 +39,7 @@ define void @test_indirect_branch() nounwind noreturn {
 ; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
 ; CHECK: indirectbr i8* %[[PTR]]
-    %1 = inttoptr i64 0 to i8*
+    %1 = call i8* @make_ptr() nounwind
     indirectbr i8* %1, [label %d1, label %d2]
 
 d1:
