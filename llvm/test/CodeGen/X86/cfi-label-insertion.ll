@@ -11,23 +11,20 @@ declare void @not_defined_here() nounwind
 
 define void @test_extern_fn() nounwind uwtable {
 ; CHECK-LABEL: test_extern_fn:
-; CHECK: movl %ecx, %ecx
-; CHECK-NEXT: movl %edx, %edx
+; CHECK: endbr64
 
   ret void
 }
 
 define private void @test_called_indirectly_private_fn() nounwind uwtable {
 ; CHECK-LABEL: test_called_indirectly_private_fn:
-; CHECK: movl %ecx, %ecx
-; CHECK-NEXT: movl %edx, %edx
+; CHECK: endbr64
   ret void
 }
 
 define internal void @test_called_indirectly_internal_fn() nounwind uwtable {
 ; CHECK-LABEL: test_called_indirectly_internal_fn:
-; CHECK: movl %ecx, %ecx
-; CHECK-NEXT: movl %edx, %edx
+; CHECK: endbr64
   ret void
 }
 
@@ -42,8 +39,7 @@ define void @test_call() nounwind uwtable {
 ; CHECK-LABEL: test_call:
 
 ; CHECK: callq not_defined_here
-; CHECK-NEXT: movl %ecx, %ecx
-; CHECK-NEXT: movl %edx, %edx
+; CHECK-NEXT: endbr64
   call void @not_defined_here()
   ret void
 }
@@ -57,30 +53,26 @@ define i32 @test_indirectbr(i8) nounwind uwtable {
 
 case1:
 ; CHECK-LABEL: case1
-; CHECK-NEXT: movl %ecx, %ecx
-; CHECK-NEXT: movl %edx, %edx
+; CHECK-NEXT: endbr64
 
   ret i32 17
 
 case2:
 ; CHECK-LABEL: case2
-; CHECK-NEXT: movl %ecx, %ecx
-; CHECK-NEXT: movl %edx, %edx
+; CHECK-NEXT: endbr64
   ret i32 42
 }
 
 define internal void @test_no_cfi_label_internal() unnamed_addr nounwind uwtable {
 ; CHECK-LABEL: test_no_cfi_label_internal:
-; CHECK-NOT: movl %ecx, %ecx
-; CHECK-NOT: movl %edx, %edx
+; CHECK-NOT: endbr64
 
   ret void
 }
 
 define private void @test_no_cfi_label_private() unnamed_addr nounwind uwtable {
 ; CHECK-LABEL: test_no_cfi_label_private:
-; CHECK-NOT: movl %ecx, %ecx
-; CHECK-NOT: movl %edx, %edx
+; CHECK-NOT: endbr64
 
   ret void
 }
