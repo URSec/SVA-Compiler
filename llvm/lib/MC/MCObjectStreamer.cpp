@@ -15,6 +15,7 @@
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCDwarf.h"
 #include "llvm/MC/MCExpr.h"
+#include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCSection.h"
 #include "llvm/MC/MCSymbol.h"
@@ -367,9 +368,20 @@ bool MCObjectStreamer::mayHaveInstructions(MCSection &Sec) const {
 
 void MCObjectStreamer::EmitInstruction(const MCInst &Inst,
                                        const MCSubtargetInfo &STI) {
-  getAssembler().getBackend().alignBranchesBegin(*this, Inst);
+  const MCContext &Ctx = getContext();
+  const MCInstrInfo &MII = *Ctx.getInstrInfo();
+  bool NeedsBundleLock = Ctx.sva() && MII.get(Inst.getOpcode()).isCall();
+  if (NeedsBundleLock) {
+    EmitBundleLock(/* AlignToEnd */ true);
+  } else {
+    getAssembler().getBackend().alignBranchesBegin(*this, Inst);
+  }
   EmitInstructionImpl(Inst, STI);
-  getAssembler().getBackend().alignBranchesEnd(*this, Inst);
+  if (NeedsBundleLock) {
+    EmitBundleUnlock();
+  } else {
+    getAssembler().getBackend().alignBranchesEnd(*this, Inst);
+  }
 }
 
 void MCObjectStreamer::EmitInstructionImpl(const MCInst &Inst,

@@ -43,7 +43,12 @@ MCELFStreamer::MCELFStreamer(MCContext &Context,
                              std::unique_ptr<MCObjectWriter> OW,
                              std::unique_ptr<MCCodeEmitter> Emitter)
     : MCObjectStreamer(Context, std::move(TAB), std::move(OW),
-                       std::move(Emitter)) {}
+                       std::move(Emitter)) {
+  if (Context.sva()) {
+    // TODO: The alignment amount should be target-dependent
+    EmitBundleAlignMode(5);
+  }
+}
 
 bool MCELFStreamer::isBundleLocked() const {
   return getCurrentSectionOnly()->isBundleLocked();
