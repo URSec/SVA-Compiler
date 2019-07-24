@@ -707,7 +707,14 @@ Error runChecks(Session &S) {
                                           TripleName,
                                       inconvertibleErrorCode()));
 
-  MCContext Ctx(MAI.get(), MRI.get(), nullptr);
+  std::unique_ptr<MCInstrInfo> MII(TheTarget->createMCInstrInfo());
+  if (!MII)
+    ExitOnErr(make_error<StringError>("Unable to create target instruction "
+                                      "info for " +
+                                          TripleName,
+                                      inconvertibleErrorCode()));
+
+  MCContext Ctx(MAI.get(), MII.get(), MRI.get(), nullptr);
 
   std::unique_ptr<MCDisassembler> Disassembler(
       TheTarget->createMCDisassembler(*STI, Ctx));
@@ -715,8 +722,6 @@ Error runChecks(Session &S) {
     ExitOnErr(make_error<StringError>("Unable to create disassembler for " +
                                           TripleName,
                                       inconvertibleErrorCode()));
-
-  std::unique_ptr<MCInstrInfo> MII(TheTarget->createMCInstrInfo());
 
   std::unique_ptr<MCInstPrinter> InstPrinter(
       TheTarget->createMCInstPrinter(Triple(TripleName), 0, *MAI, *MII, *MRI));

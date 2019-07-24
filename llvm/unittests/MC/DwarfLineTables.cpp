@@ -11,6 +11,7 @@
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCDwarf.h"
+#include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCTargetOptions.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -23,6 +24,7 @@ namespace {
 struct Context {
   const char *Triple = "x86_64-pc-linux";
   std::unique_ptr<MCRegisterInfo> MRI;
+  std::unique_ptr<MCInstrInfo> MII;
   std::unique_ptr<MCAsmInfo> MAI;
   std::unique_ptr<MCContext> Ctx;
 
@@ -40,7 +42,8 @@ struct Context {
     MRI.reset(TheTarget->createMCRegInfo(Triple));
     MCTargetOptions MCOptions;
     MAI.reset(TheTarget->createMCAsmInfo(*MRI, Triple, MCOptions));
-    Ctx = std::make_unique<MCContext>(MAI.get(), MRI.get(), nullptr);
+    MII.reset(TheTarget->createMCInstrInfo());
+    Ctx = std::make_unique<MCContext>(MAI.get(), MII.get(), MRI.get(), nullptr);
   }
 
   operator bool() { return Ctx.get(); }

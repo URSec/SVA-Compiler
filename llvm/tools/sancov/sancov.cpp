@@ -720,19 +720,19 @@ static void getObjectCoveragePoints(const object::ObjectFile &O,
       TheTarget->createMCRegInfo(TripleName));
   failIfEmpty(MRI, "no register info for target " + TripleName);
 
+  std::unique_ptr<const MCInstrInfo> MII(TheTarget->createMCInstrInfo());
+  failIfEmpty(MII, "no instruction info for target " + TripleName);
+
   MCTargetOptions MCOptions;
   std::unique_ptr<const MCAsmInfo> AsmInfo(
       TheTarget->createMCAsmInfo(*MRI, TripleName, MCOptions));
   failIfEmpty(AsmInfo, "no asm info for target " + TripleName);
 
   std::unique_ptr<const MCObjectFileInfo> MOFI(new MCObjectFileInfo);
-  MCContext Ctx(AsmInfo.get(), MRI.get(), MOFI.get());
+  MCContext Ctx(AsmInfo.get(), MII.get(), MRI.get(), MOFI.get());
   std::unique_ptr<MCDisassembler> DisAsm(
       TheTarget->createMCDisassembler(*STI, Ctx));
   failIfEmpty(DisAsm, "no disassembler info for target " + TripleName);
-
-  std::unique_ptr<const MCInstrInfo> MII(TheTarget->createMCInstrInfo());
-  failIfEmpty(MII, "no instruction info for target " + TripleName);
 
   std::unique_ptr<const MCInstrAnalysis> MIA(
       TheTarget->createMCInstrAnalysis(MII.get()));

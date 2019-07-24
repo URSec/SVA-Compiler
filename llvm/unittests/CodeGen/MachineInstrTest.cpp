@@ -141,7 +141,7 @@ private:
 
 std::unique_ptr<MCContext> createMCContext(MCAsmInfo *AsmInfo) {
   return std::make_unique<MCContext>(
-      AsmInfo, nullptr, nullptr, nullptr, nullptr, false);
+      AsmInfo, nullptr, nullptr, nullptr, false, nullptr, nullptr, false);
 }
 
 std::unique_ptr<BogusTargetMachine> createTargetMachine() {

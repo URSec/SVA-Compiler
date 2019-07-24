@@ -98,7 +98,7 @@ initializeRecordStreamer(const Module &M,
     return;
 
   MCObjectFileInfo MOFI;
-  MCContext MCCtx(MAI.get(), MRI.get(), &MOFI);
+  MCContext MCCtx(MAI.get(), MCII.get(), MRI.get(), &MOFI);
   MOFI.InitMCObjectFileInfo(TT, /*PIC*/ false, MCCtx);
   MOFI.setSDKVersion(M.getSDKVersion());
   RecordStreamer Streamer(MCCtx, M);

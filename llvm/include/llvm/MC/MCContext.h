@@ -43,6 +43,7 @@ namespace llvm {
 
   class CodeViewContext;
   class MCAsmInfo;
+  class MCInstrInfo;
   class MCLabel;
   class MCObjectFileInfo;
   class MCRegisterInfo;
@@ -75,6 +76,9 @@ namespace llvm {
 
     /// The MCAsmInfo for this target.
     const MCAsmInfo *MAI;
+
+    /// The MCInstrInfo for this target.
+    const MCInstrInfo *MII;
 
     /// The MCRegisterInfo for this target.
     const MCRegisterInfo *MRI;
@@ -128,6 +132,11 @@ namespace llvm {
     /// GetInstance() gets the current instance of the directional local label
     /// for the LocalLabelVal and adds it to the map if needed.
     unsigned GetInstance(unsigned LocalLabelVal);
+
+    /// Whether or not we are compiling for SVA.
+    ///
+    /// Used e.g. to determine whether or not to set bundle alignment.
+    bool SVA;
 
     /// The file name of the log file from the environment variable
     /// AS_SECURE_LOG_FILE.  Which must be set before the .secure_log_unique
@@ -302,9 +311,9 @@ namespace llvm {
     StringMap<MCAsmMacro> MacroMap;
 
   public:
-    explicit MCContext(const MCAsmInfo *MAI, const MCRegisterInfo *MRI,
-                       const MCObjectFileInfo *MOFI,
-                       const SourceMgr *Mgr = nullptr,
+    explicit MCContext(const MCAsmInfo *MAI, const MCInstrInfo *MII,
+                       const MCRegisterInfo *MRI, const MCObjectFileInfo *MOFI,
+                       bool SVA = false, const SourceMgr *Mgr = nullptr,
                        MCTargetOptions const *TargetOpts = nullptr,
                        bool DoAutoReset = true);
     MCContext(const MCContext &) = delete;
@@ -317,11 +326,18 @@ namespace llvm {
 
     const MCAsmInfo *getAsmInfo() const { return MAI; }
 
+    const MCInstrInfo *getInstrInfo() const { return MII; }
+
     const MCRegisterInfo *getRegisterInfo() const { return MRI; }
 
     const MCObjectFileInfo *getObjectFileInfo() const { return MOFI; }
 
     CodeViewContext &getCVContext();
+
+    /// Return whether or not we are compiling for SVA.
+    ///
+    /// @return True if we are compiling for SVA, otherwise false.
+    bool sva() const { return SVA; }
 
     void setAllowTemporaryLabels(bool Value) { AllowTemporaryLabels = Value; }
     void setUseNamesOnTempLabels(bool Value) { UseNamesOnTempLabels = Value; }

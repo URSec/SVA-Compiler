@@ -74,7 +74,8 @@ LLVMCreateDisasmCPUFeatures(const char *TT, const char *CPU,
     return nullptr;
 
   // Set up the MCContext for creating symbols and MCExpr's.
-  std::unique_ptr<MCContext> Ctx(new MCContext(MAI.get(), MRI.get(), nullptr));
+  std::unique_ptr<MCContext> Ctx(new MCContext(MAI.get(), MII.get(), MRI.get(),
+                                               nullptr));
   if (!Ctx)
     return nullptr;
 

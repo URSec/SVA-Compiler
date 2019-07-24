@@ -756,14 +756,16 @@ static int linkAndVerify() {
   if (!MAI)
     ErrorAndExit("Unable to create target asm info!");
 
-  MCContext Ctx(MAI.get(), MRI.get(), nullptr);
+  std::unique_ptr<MCInstrInfo> MII(TheTarget->createMCInstrInfo());
+  if (!MII)
+    ErrorAndExit("Unable to create target instruction info!");
+
+  MCContext Ctx(MAI.get(), MII.get(), MRI.get(), nullptr);
 
   std::unique_ptr<MCDisassembler> Disassembler(
     TheTarget->createMCDisassembler(*STI, Ctx));
   if (!Disassembler)
     ErrorAndExit("Unable to create disassembler!");
-
-  std::unique_ptr<MCInstrInfo> MII(TheTarget->createMCInstrInfo());
 
   std::unique_ptr<MCInstPrinter> InstPrinter(
       TheTarget->createMCInstPrinter(Triple(TripleName), 0, *MAI, *MII, *MRI));

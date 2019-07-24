@@ -1562,7 +1562,7 @@ static void disassembleObject(const ObjectFile *Obj, bool InlineRelocs) {
     reportError(Obj->getFileName(),
                 "no instruction info for target " + TripleName);
   MCObjectFileInfo MOFI;
-  MCContext Ctx(AsmInfo.get(), MRI.get(), &MOFI);
+  MCContext Ctx(AsmInfo.get(), MII.get(), MRI.get(), &MOFI);
   // FIXME: for now initialize MCObjectFileInfo with default values
   MOFI.InitMCObjectFileInfo(Triple(TripleName), false, Ctx);
 

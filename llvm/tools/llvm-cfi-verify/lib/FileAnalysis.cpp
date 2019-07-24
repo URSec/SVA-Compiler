@@ -404,7 +404,8 @@ Error FileAnalysis::initialiseDisassemblyMembers() {
   if (!MII)
     return make_error<UnsupportedDisassembly>("Failed to initialise MII.");
 
-  Context.reset(new MCContext(AsmInfo.get(), RegisterInfo.get(), &MOFI));
+  Context.reset(new MCContext(AsmInfo.get(), MII.get(), RegisterInfo.get(),
+                              &MOFI));
 
   Disassembler.reset(
       ObjectTarget->createMCDisassembler(*SubtargetInfo, *Context));

@@ -171,7 +171,7 @@ int AssembleOneInput(const uint8_t *Data, size_t Size) {
 
 
   MCObjectFileInfo MOFI;
-  MCContext Ctx(MAI.get(), MRI.get(), &MOFI, &SrcMgr);
+  MCContext Ctx(MAI.get(), MRI.get(), &MOFI, false, &SrcMgr);
 
   static const bool UsePIC = false;
   MOFI.InitMCObjectFileInfo(TheTriple, UsePIC, Ctx);

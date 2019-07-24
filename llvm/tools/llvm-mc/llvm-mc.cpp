@@ -355,6 +355,9 @@ int main(int argc, char **argv) {
       TheTarget->createMCAsmInfo(*MRI, TripleName, MCOptions));
   assert(MAI && "Unable to create target asm info!");
 
+  std::unique_ptr<MCInstrInfo> MCII(TheTarget->createMCInstrInfo());
+  assert(MCII && "Unable to create target instruction info!");
+
   MAI->setRelaxELFRelocations(RelaxELFRel);
 
   if (CompressDebugSections != DebugCompressionType::None) {
@@ -370,7 +373,8 @@ int main(int argc, char **argv) {
   // FIXME: This is not pretty. MCContext has a ptr to MCObjectFileInfo and
   // MCObjectFileInfo needs a MCContext reference in order to initialize itself.
   MCObjectFileInfo MOFI;
-  MCContext Ctx(MAI.get(), MRI.get(), &MOFI, &SrcMgr, &MCOptions);
+  MCContext Ctx(MAI.get(), MCII.get(), MRI.get(), &MOFI, false, &SrcMgr,
+                &MCOptions);
   MOFI.InitMCObjectFileInfo(TheTriple, PIC, Ctx, LargeCodeModel);
 
   if (SaveTempLabels)
@@ -436,7 +440,6 @@ int main(int argc, char **argv) {
   raw_pwrite_stream *OS = &Out->os();
   std::unique_ptr<MCStreamer> Str;
 
-  std::unique_ptr<MCInstrInfo> MCII(TheTarget->createMCInstrInfo());
   std::unique_ptr<MCSubtargetInfo> STI(
       TheTarget->createMCSubtargetInfo(TripleName, MCPU, FeaturesStr));
 

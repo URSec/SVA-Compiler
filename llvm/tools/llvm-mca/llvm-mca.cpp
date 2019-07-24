@@ -358,19 +358,20 @@ int main(int argc, char **argv) {
       TheTarget->createMCAsmInfo(*MRI, TripleName, MCOptions));
   assert(MAI && "Unable to create target asm info!");
 
+  std::unique_ptr<MCInstrInfo> MCII(TheTarget->createMCInstrInfo());
+  assert(MCII && "Unable to create target instruction info!");
+
   MCObjectFileInfo MOFI;
   SourceMgr SrcMgr;
 
   // Tell SrcMgr about this buffer, which is what the parser will pick up.
   SrcMgr.AddNewSourceBuffer(std::move(*BufferPtr), SMLoc());
 
-  MCContext Ctx(MAI.get(), MRI.get(), &MOFI, &SrcMgr);
+  MCContext Ctx(MAI.get(), MCII.get(), MRI.get(), &MOFI, &SrcMgr);
 
   MOFI.InitMCObjectFileInfo(TheTriple, /* PIC= */ false, Ctx);
 
   std::unique_ptr<buffer_ostream> BOS;
-
-  std::unique_ptr<MCInstrInfo> MCII(TheTarget->createMCInstrInfo());
 
   std::unique_ptr<MCInstrAnalysis> MCIA(
       TheTarget->createMCInstrAnalysis(MCII.get()));

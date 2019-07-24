@@ -57,11 +57,12 @@ AsSecureLogFileName("as-secure-log-file-name",
                  "AS_SECURE_LOG_FILE env variable)"),
         cl::init(getenv("AS_SECURE_LOG_FILE")), cl::Hidden);
 
-MCContext::MCContext(const MCAsmInfo *mai, const MCRegisterInfo *mri,
-                     const MCObjectFileInfo *mofi, const SourceMgr *mgr,
+MCContext::MCContext(const MCAsmInfo *mai, const MCInstrInfo *mii,
+                     const MCRegisterInfo *mri, const MCObjectFileInfo *mofi,
+                     bool sva, const SourceMgr *mgr,
                      MCTargetOptions const *TargetOpts, bool DoAutoReset)
-    : SrcMgr(mgr), InlineSrcMgr(nullptr), MAI(mai), MRI(mri), MOFI(mofi),
-      Symbols(Allocator), UsedNames(Allocator),
+    : SrcMgr(mgr), InlineSrcMgr(nullptr), MAI(mai), MII(mii), MRI(mri),
+      MOFI(mofi), SVA(sva), Symbols(Allocator), UsedNames(Allocator),
       InlineAsmUsedLabelNames(Allocator),
       CurrentDwarfLoc(0, 0, 0, DWARF2_FLAG_IS_STMT, 0, 0),
       AutoReset(DoAutoReset), TargetOptions(TargetOpts) {

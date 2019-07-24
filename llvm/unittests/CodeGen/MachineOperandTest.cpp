@@ -318,7 +318,7 @@ TEST(MachineOperandTest, PrintMetadata) {
 
 TEST(MachineOperandTest, PrintMCSymbol) {
   MCAsmInfo MAI;
-  MCContext Ctx(&MAI, /*MRI=*/nullptr, /*MOFI=*/nullptr);
+  MCContext Ctx(&MAI, /*MII=*/nullptr, /*MRI=*/nullptr, /*MOFI=*/nullptr);
   MCSymbol *Sym = Ctx.getOrCreateSymbol("foo");
 
   // Create a MachineOperand with a metadata and print it.

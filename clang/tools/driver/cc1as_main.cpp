@@ -359,6 +359,9 @@ static bool ExecuteAssembler(AssemblerInvocation &Opts,
       TheTarget->createMCAsmInfo(*MRI, Opts.Triple, MCOptions));
   assert(MAI && "Unable to create target asm info!");
 
+  std::unique_ptr<MCInstrInfo> MCII(TheTarget->createMCInstrInfo());
+  assert(MCII && "Unable to create target instruction info!");
+
   // Ensure MCAsmInfo initialization occurs before any use, otherwise sections
   // may be created with a combination of default and explicit settings.
   MAI->setCompressDebugSections(Opts.CompressDebugSections);
@@ -380,7 +383,8 @@ static bool ExecuteAssembler(AssemblerInvocation &Opts,
   // MCObjectFileInfo needs a MCContext reference in order to initialize itself.
   std::unique_ptr<MCObjectFileInfo> MOFI(new MCObjectFileInfo());
 
-  MCContext Ctx(MAI.get(), MRI.get(), MOFI.get(), &SrcMgr, &MCOptions);
+  MCContext Ctx(
+    MAI.get(), MCII.get(), MRI.get(), MOFI.get(), false, &SrcMgr, &MCOptions);
 
   bool PIC = false;
   if (Opts.RelocationModel == "static") {
@@ -430,7 +434,6 @@ static bool ExecuteAssembler(AssemblerInvocation &Opts,
 
   std::unique_ptr<MCStreamer> Str;
 
-  std::unique_ptr<MCInstrInfo> MCII(TheTarget->createMCInstrInfo());
   std::unique_ptr<MCSubtargetInfo> STI(
       TheTarget->createMCSubtargetInfo(Opts.Triple, Opts.CPU, FS));
 

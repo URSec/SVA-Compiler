@@ -66,8 +66,12 @@ bool DwarfStreamer::init(Triple TheTriple) {
   if (!MAI)
     return error("no asm info for target " + TripleName, Context);
 
+  MII.reset(TheTarget->createMCInstrInfo());
+  if (!MII)
+    return error("no instr info info for target " + TripleName, Context);
+
   MOFI.reset(new MCObjectFileInfo);
-  MC.reset(new MCContext(MAI.get(), MRI.get(), MOFI.get()));
+  MC.reset(new MCContext(MAI.get(), MII.get(), MRI.get(), MOFI.get()));
   MOFI->InitMCObjectFileInfo(TheTriple, /*PIC*/ false, *MC);
 
   MSTI.reset(TheTarget->createMCSubtargetInfo(TripleName, "", ""));
@@ -77,10 +81,6 @@ bool DwarfStreamer::init(Triple TheTriple) {
   MAB = TheTarget->createMCAsmBackend(*MSTI, *MRI, MCOptions);
   if (!MAB)
     return error("no asm backend for target " + TripleName, Context);
-
-  MII.reset(TheTarget->createMCInstrInfo());
-  if (!MII)
-    return error("no instr info info for target " + TripleName, Context);
 
   MCE = TheTarget->createMCCodeEmitter(*MII, *MRI, *MC);
   if (!MCE)

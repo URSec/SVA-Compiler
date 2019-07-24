@@ -173,7 +173,9 @@ Analysis::Analysis(const Target &Target, std::unique_ptr<MCInstrInfo> InstrInfo,
       Triple(FirstPoint.LLVMTriple), 0 /*default variant*/, *AsmInfo_,
       *InstrInfo_, *RegInfo_));
 
-  Context_ = std::make_unique<MCContext>(AsmInfo_.get(), RegInfo_.get(),
+  Context_ = std::make_unique<MCContext>(AsmInfo_.get(),
+                                         InstrInfo_.get(),
+                                         RegInfo_.get(),
                                          &ObjectFileInfo_);
   Disasm_.reset(Target.createMCDisassembler(*SubtargetInfo_, *Context_));
   assert(Disasm_ && "cannot create MCDisassembler. missing call to "
