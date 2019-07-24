@@ -55,8 +55,8 @@ public:
 
   /// CFI label value.
   ///
-  /// Encoding of `mov %ecx, %ecx; mov %edx, %edx`.
-  static const constexpr uint32_t CFILabel = 0xd289c989U;
+  /// Encoding of `endbr64`.
+  static const constexpr uint32_t CFILabel = 0xfa1e0ff3U;
 
   /// CFI label size.
   static const constexpr size_t CFILabelSize = 4;

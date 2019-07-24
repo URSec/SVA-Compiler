@@ -14,7 +14,7 @@ define void @test_call() nounwind noreturn {
 
 ; CHECK: %[[TYPE_ERASED_PTR:[[:alnum:]_.]+]] = bitcast void ()* %[[PTR:[[:alnum:]_.]+]] to i8*
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[TYPE_ERASED_PTR]], i32 1)
-; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -762721911, %{{[[:alnum:]_.]+}}
+; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
 ; CHECK: call void %[[PTR]]
 ; CHECK-NEXT: unreachable
@@ -32,7 +32,7 @@ define void @test_indirect_branch() nounwind noreturn {
 
 ; CHECK: %[[TYPE_ERASED_PTR:[[:alnum:]_.]+]] = bitcast i8* %[[PTR:[[:alnum:]_.]+]] to i8*
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[TYPE_ERASED_PTR]], i32 1)
-; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -762721911, %{{[[:alnum:]_.]+}}
+; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
 ; CHECK: indirectbr i8* %[[PTR]]
     %1 = inttoptr i64 0 to i8*
@@ -54,7 +54,7 @@ define void @test_return_void() nounwind {
 
 ; CHECK: %[[TYPE_ERASED_PTR:[[:alnum:]_.]+]] = bitcast i8* %[[PTR:[[:alnum:]_.]+]] to i8*
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[TYPE_ERASED_PTR]], i32 1)
-; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -762721911, %{{[[:alnum:]_.]+}}
+; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
 ; CHECK: ret void
     ret void
@@ -69,7 +69,7 @@ define i32 @test_return_value() nounwind {
 
 ; CHECK: %[[TYPE_ERASED_PTR:[[:alnum:]_.]+]] = bitcast i8* %[[PTR:[[:alnum:]_.]+]] to i8*
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[TYPE_ERASED_PTR]], i32 1)
-; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -762721911, %{{[[:alnum:]_.]+}}
+; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
 ; CHECK: ret i32 0
     ret i32 0

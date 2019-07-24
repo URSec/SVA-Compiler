@@ -14,7 +14,7 @@ define void @test_call() nounwind noreturn {
 
 ; CHECK: %[[INT_MASKED:[[:alnum:]_.]+]] = or i64 %{{[[:alnum:]_.]+}}, -2147483648
 ; CHECK: %[[MASKED:[[:alnum:]_.]+]] = inttoptr i64 %[[INT_MASKED]] to void ()*
-; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -762721911, %{{[[:alnum:]_.]+}}
+; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
 ; CHECK: call void %[[MASKED]]
 ; CHECK-NEXT: unreachable

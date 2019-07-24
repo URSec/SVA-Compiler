@@ -14,7 +14,7 @@ define void @test_return_void() nounwind {
 
 ; CHECK: %[[INT_MASKED:[[:alnum:]_.]+]] = or i64 %{{[[:alnum:]_.]+}}, -2147483648
 ; CHECK: %[[MASKED:[[:alnum:]_.]+]] = inttoptr i64 %[[INT_MASKED]] to i8*
-; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -762721911, %{{[[:alnum:]_.]+}}
+; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
 ; CHECK: %[[TYPED_MASKED:[[:alnum:]_.]+]] = ptrtoint i8* %[[MASKED]] to i64
 ; CHECK: store i64 %[[TYPED_MASKED]], i64* %{{[[:alnum:]_.]+}}
@@ -31,7 +31,7 @@ define i32 @test_return_value() nounwind {
 
 ; CHECK: %[[INT_MASKED:[[:alnum:]_.]+]] = or i64 %{{[[:alnum:]_.]+}}, -2147483648
 ; CHECK: %[[MASKED:[[:alnum:]_.]+]] = inttoptr i64 %[[INT_MASKED]] to i8*
-; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -762721911, %{{[[:alnum:]_.]+}}
+; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
 ; CHECK: %[[TYPED_MASKED:[[:alnum:]_.]+]] = ptrtoint i8* %[[MASKED]] to i64
 ; CHECK: store i64 %[[TYPED_MASKED]], i64* %{{[[:alnum:]_.]+}}

@@ -14,7 +14,7 @@ define void @test_indirect_branch() nounwind noreturn {
 
 ; CHECK: %[[INT_MASKED:[[:alnum:]_.]+]] = or i64 %{{[[:alnum:]_.]+}}, -2147483648
 ; CHECK: %[[MASKED:[[:alnum:]_.]+]] = inttoptr i64 %[[INT_MASKED]] to i8*
-; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -762721911, %{{[[:alnum:]_.]+}}
+; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
 ; CHECK: indirectbr i8* %[[MASKED]]
     %1 = inttoptr i64 0 to i8*
