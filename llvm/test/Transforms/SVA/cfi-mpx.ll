@@ -16,11 +16,14 @@ declare i8* @make_ptr() nounwind
 define void @test_call() nounwind noreturn {
 ; CHECK-LABEL: @test_call
 
-; CHECK: %[[TYPE_ERASED_PTR:[[:alnum:]_.]+]] = bitcast void ()* %[[PTR:[[:alnum:]_.]+]] to i8*
+; CHECK: %[[INT_PTR:[[:alnum:]_.]+]] = ptrtoint void ()* %[[PTR:[[:alnum:]_.]+]] to i64
+; CHECK: %[[ALIGNED:[[:alnum:]_.]+]] = and i64 %[[INT_PTR]], -32
+; CHECK: %[[TYPE_ERASED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[ALIGNED]] to i8*
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[TYPE_ERASED_PTR]], i32 1)
+; CHECK: %[[ALIGNED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[ALIGNED]] to void ()*
 ; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
-; CHECK: call void %[[PTR]]
+; CHECK: call void %[[ALIGNED_PTR]]
 ; CHECK-NEXT: unreachable
     %1 = call void()* @make_fn_ptr() nounwind
     call void %1() nounwind noreturn
@@ -34,11 +37,14 @@ define void @test_call() nounwind noreturn {
 define void @test_indirect_branch() nounwind noreturn {
 ; CHECK-LABEL: @test_indirect_branch
 
-; CHECK: %[[TYPE_ERASED_PTR:[[:alnum:]_.]+]] = bitcast i8* %[[PTR:[[:alnum:]_.]+]] to i8*
+; CHECK: %[[INT_PTR:[[:alnum:]_.]+]] = ptrtoint i8* %[[PTR:[[:alnum:]_.]+]] to i64
+; CHECK: %[[ALIGNED:[[:alnum:]_.]+]] = and i64 %[[INT_PTR]], -32
+; CHECK: %[[TYPE_ERASED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[ALIGNED]] to i8*
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[TYPE_ERASED_PTR]], i32 1)
+; CHECK: %[[ALIGNED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[ALIGNED]] to i8*
 ; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
-; CHECK: indirectbr i8* %[[PTR]]
+; CHECK: indirectbr i8* %[[ALIGNED_PTR]]
     %1 = call i8* @make_ptr() nounwind
     indirectbr i8* %1, [label %d1, label %d2]
 
@@ -56,10 +62,15 @@ d2:
 define void @test_return_void() nounwind {
 ; CHECK-LABEL: @test_return_void
 
-; CHECK: %[[TYPE_ERASED_PTR:[[:alnum:]_.]+]] = bitcast i8* %[[PTR:[[:alnum:]_.]+]] to i8*
+; CHECK: %[[INT_PTR:[[:alnum:]_.]+]] = ptrtoint i8* %[[PTR:[[:alnum:]_.]+]] to i64
+; CHECK: %[[ALIGNED:[[:alnum:]_.]+]] = and i64 %[[INT_PTR]], -32
+; CHECK: %[[TYPE_ERASED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[ALIGNED]] to i8*
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[TYPE_ERASED_PTR]], i32 1)
+; CHECK: %[[ALIGNED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[ALIGNED]] to i8*
 ; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
+; CHECK: %[[NEW_RET_ADDR:[[:alnum:]_.]+]] = ptrtoint i8* %[[ALIGNED_PTR]] to i64
+; CHECK: store i64 %[[NEW_RET_ADDR]], i64* %{{[[:alnum:]_.]+}}
 ; CHECK: ret void
     ret void
 
@@ -71,10 +82,15 @@ define void @test_return_void() nounwind {
 define i32 @test_return_value() nounwind {
 ; CHECK-LABEL: @test_return_value
 
-; CHECK: %[[TYPE_ERASED_PTR:[[:alnum:]_.]+]] = bitcast i8* %[[PTR:[[:alnum:]_.]+]] to i8*
+; CHECK: %[[INT_PTR:[[:alnum:]_.]+]] = ptrtoint i8* %[[PTR:[[:alnum:]_.]+]] to i64
+; CHECK: %[[ALIGNED:[[:alnum:]_.]+]] = and i64 %[[INT_PTR]], -32
+; CHECK: %[[TYPE_ERASED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[ALIGNED]] to i8*
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[TYPE_ERASED_PTR]], i32 1)
+; CHECK: %[[ALIGNED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[ALIGNED]] to i8*
 ; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
+; CHECK: %[[NEW_RET_ADDR:[[:alnum:]_.]+]] = ptrtoint i8* %[[ALIGNED_PTR]] to i64
+; CHECK: store i64 %[[NEW_RET_ADDR]], i64* %{{[[:alnum:]_.]+}}
 ; CHECK: ret i32 0
     ret i32 0
 

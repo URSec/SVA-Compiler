@@ -87,15 +87,29 @@ Value *CFI::addBitMasking(Value &Callee, Instruction &I) {
   /// Integer type that is the size of a pointer on the target machine.
   Type *IntPtrTy = DL.getIntPtrType(I.getContext());
 
+  Value *CalleeAddress = new PtrToIntInst(&Callee,
+                                          IntPtrTy,
+                                          Callee.getName(),
+                                          &I);
+
+  /// Mask to ensure alignment of the target
+  Value *AlignmentMask = ConstantInt::get(IntPtrTy, -(1UL << CFI::Alignment));
+
+  Value *AlignedCallee = BinaryOperator::Create(Instruction::And,
+                                                CalleeAddress,
+                                                AlignmentMask,
+                                                Callee.getName() + ".aligned",
+                                                &I);
+
   if (UseMPX) {
     /// A reference to the context to the LLVM module which this code is
     /// transforming.
     LLVMContext &Ctx = I.getContext();
 
-    Value *CastedCallee = new BitCastInst(&Callee,
-                                          Type::getInt8PtrTy(Ctx),
-                                          Callee.getName(),
-                                          &I);
+    Value *CastedCallee = new IntToPtrInst(AlignedCallee,
+                                           Type::getInt8PtrTy(Ctx),
+                                           AlignedCallee->getName(),
+                                           &I);
     Function *BoundsCheckLowerIntrin
       = Intrinsic::getDeclaration(I.getModule(), Intrinsic::x86_bndcl);
     Value *BoundsReg = ConstantInt::get(Type::getInt32Ty(Ctx), 1);
@@ -103,30 +117,28 @@ Value *CFI::addBitMasking(Value &Callee, Instruction &I) {
                      {CastedCallee, BoundsReg},
                      "",
                      &I);
-    return &Callee;
+
+    return new IntToPtrInst(AlignedCallee,
+                            Callee.getType(),
+                            AlignedCallee->getName(),
+                            &I);
   } else {
     // Create the integer values used for bit-masking.
     Value *Mask = ConstantInt::get(IntPtrTy, KernelAddrSpaceMask);
     Value *svaLow = ConstantInt::get(IntPtrTy, SVALowAddr);
     Value *svaHigh = ConstantInt::get(IntPtrTy, SVAHighAddr);
 
-    // Convert the pointer into an integer and then shift the higher order bits
-    // into the lower-half of the integer.  Bit-masking operations can use
-    // constant operands, reducing register pressure, if the operands are 32-bits
-    // or smaller.
-    Value *CastedPointer = new PtrToIntInst(&Callee, IntPtrTy, "ptr", &I);
-
     // Create instructions that create a version of the pointer with the proper
-    // bit set.
+    // bits set.
     Value *MaskedPointer = BinaryOperator::Create(Instruction::Or,
-                                                  CastedPointer,
+                                                  AlignedCallee,
                                                   Mask,
-                                                  "setMask",
+                                                  Callee.getName() + ".masked",
                                                   &I);
 
     Value *Final = new IntToPtrInst(MaskedPointer,
                                     Callee.getType(),
-                                    "masked",
+                                    MaskedPointer->getName(),
                                     &I);
 
     // Insert a special check to protect SVA memory.  Note that this is a hack
@@ -254,19 +266,13 @@ CFI::visitReturnInst(ReturnInst &RI) {
   Value *MaskedReturn = addBitMasking(*RetAddrAsPtr, RI);
   auto Next = addLabelCheck(*MaskedReturn, RI);
 
-  // If we are using MPX, then we will trap on a bad return address instead of
-  // needing to mask and overwrite it, and we will therefore store the same
-  // value that we read.
-  // FIXME: We should probably rely on dead store elimination for this
-  if (!UseMPX) {
-    // See FIXME above about casting return address to pointer
-    Value *CastedMaskedReturn = new PtrToIntInst(MaskedReturn,
-                                                 RetAddrTy,
-                                                 "checkedretaddr",
-                                                 &RI);
+  // See FIXME above about casting return address to pointer
+  Value *CastedMaskedReturn = new PtrToIntInst(MaskedReturn,
+                                               RetAddrTy,
+                                               "checkedretaddr",
+                                               &RI);
 
-    new StoreInst(CastedMaskedReturn, AddrOfRetAddr, &RI);
-  }
+  new StoreInst(CastedMaskedReturn, AddrOfRetAddr, &RI);
 
   return Next;
 }

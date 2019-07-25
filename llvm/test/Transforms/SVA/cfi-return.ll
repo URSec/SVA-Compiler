@@ -12,7 +12,8 @@ target triple = "x86_64-unknown-linux-gnu"
 define void @test_return_void() nounwind {
 ; CHECK-LABEL: @test_return_void
 
-; CHECK: %[[INT_MASKED:[[:alnum:]_.]+]] = or i64 %{{[[:alnum:]_.]+}}, -2147483648
+; CHECK: %[[ALIGNED:[[:alnum:]_.]+]] = and i64 %{{[[:alnum:]_.]+}}, -32
+; CHECK: %[[INT_MASKED:[[:alnum:]_.]+]] = or i64 %[[ALIGNED]], -2147483648
 ; CHECK: %[[MASKED:[[:alnum:]_.]+]] = inttoptr i64 %[[INT_MASKED]] to i8*
 ; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
@@ -29,7 +30,8 @@ define void @test_return_void() nounwind {
 define i32 @test_return_value() nounwind {
 ; CHECK-LABEL: @test_return_value
 
-; CHECK: %[[INT_MASKED:[[:alnum:]_.]+]] = or i64 %{{[[:alnum:]_.]+}}, -2147483648
+; CHECK: %[[ALIGNED:[[:alnum:]_.]+]] = and i64 %{{[[:alnum:]_.]+}}, -32
+; CHECK: %[[INT_MASKED:[[:alnum:]_.]+]] = or i64 %[[ALIGNED]], -2147483648
 ; CHECK: %[[MASKED:[[:alnum:]_.]+]] = inttoptr i64 %[[INT_MASKED]] to i8*
 ; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail

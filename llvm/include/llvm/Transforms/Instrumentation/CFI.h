@@ -61,6 +61,9 @@ public:
   /// CFI label size.
   static const constexpr size_t CFILabelSize = 4;
 
+  /// Alignment of targets as log2(bytes).
+  static const constexpr unsigned int Alignment = 5;
+
   /// Create a new CFI pass instance with parameters initialized from
   /// command-line options to LLVM.
   explicit CFI();
