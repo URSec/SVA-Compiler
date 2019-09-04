@@ -605,6 +605,14 @@ BitVector X86RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   assert(checkAllSuperRegsMarked(Reserved,
                                  {X86::SIL, X86::DIL, X86::BPL, X86::SPL,
                                   X86::SIH, X86::DIH, X86::BPH, X86::SPH}));
+
+  // Mark %bnd0 and %bnd1 as reserved for SVA.
+  if (MF.getTarget().doSVA()) {
+    // TODO: Sholud check if SVA is using MPX
+    Reserved.set(X86::BND0);
+    Reserved.set(X86::BND1);
+  }
+
   return Reserved;
 }
 
