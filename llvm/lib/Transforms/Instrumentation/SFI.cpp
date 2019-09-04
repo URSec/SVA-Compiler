@@ -377,10 +377,6 @@ public:
   LegacySFI(bool LoadChecks, bool SVAMemChecks, bool UseMPX)
     : FunctionPass(ID), SFIPass(LoadChecks, SVAMemChecks, UseMPX) { }
 
-  virtual bool doInitialization(Module &M) override {
-    return SFIPass.doInitialization(M);
-  }
-
   virtual bool runOnFunction(Function &F) override {
     //
     // Skip pmap_bootstrap() in sys/amd64/amd64/pmap.c.
@@ -395,6 +391,8 @@ public:
         return false;
       }
     }
+
+    SFIPass.doInitialization(*F.getParent());
 
     SFIPass.visit(F);
     return true;
