@@ -25,6 +25,7 @@
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
@@ -290,11 +291,16 @@ CFI::visit(Instruction &I) {
   }
 }
 
-BasicBlock *CFI::getOrCreateErrorBasicBlock(Function& F) {
+BasicBlock *CFI::getOrCreateErrorBasicBlock(Function &F) {
   if (ErrorBB == nullptr) {
-    ErrorBB = BasicBlock::Create(F.getContext(), "cfi_check_fail", &F);
-    CallInst::Create(Abort, "", ErrorBB);
-    new UnreachableInst(F.getContext(), ErrorBB);
+    LLVMContext &Ctx = F.getContext();
+    ErrorBB = BasicBlock::Create(Ctx, "cfi_check_fail", &F);
+    CallInst *CI = CallInst::Create(Abort, "", ErrorBB);
+    DISubprogram *Subprogram = F.getSubprogram();
+    if (Subprogram != nullptr) {
+      CI->setDebugLoc(DILocation::get(Ctx, Subprogram->getLine(), 0, Subprogram));
+    }
+    new UnreachableInst(Ctx, ErrorBB);
   } else {
     assert(ErrorBB->getParent() == &F && "Error basic block is stale");
   }
