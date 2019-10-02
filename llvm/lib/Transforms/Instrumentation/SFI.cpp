@@ -247,12 +247,14 @@ void SFI::instrumentMemoryIntrinsic(Value &Dst,
   assert(CheckF && "sva_check_buffer not found!\n");
 
   // Create a call to the checking function.
-  CallInst::Create(CheckF, {DstInt, &Len}, "", &I);
+  CallInst *CI = CallInst::Create(CheckF, {DstInt, &Len}, "", &I);
+  CI->setDebugLoc(I.getDebugLoc());
 
   // Create another call to check the source if SFI checks on loads have been
   // enabled.
   if (LoadChecks && Src != nullptr) {
-    CallInst::Create(CheckF, {SrcInt, &Len}, "", &I);
+    CallInst *CI = CallInst::Create(CheckF, {SrcInt, &Len}, "", &I);
+    CI->setDebugLoc(I.getDebugLoc());
   }
 }
 
