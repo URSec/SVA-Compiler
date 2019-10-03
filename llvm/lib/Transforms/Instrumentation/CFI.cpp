@@ -252,11 +252,15 @@ CFI::visitReturnInst(ReturnInst &RI) {
   Type *RetAddrTy = getReturnAddrTy(Ctx, DL);
   Function *AddrOfRetAddrIntrin
     = Intrinsic::getDeclaration(RI.getModule(),
-                                Intrinsic::addressofreturnaddress,
-                                {RetAddrTy->getPointerTo()});
-  Value *AddrOfRetAddr = CallInst::Create(AddrOfRetAddrIntrin,
-                                          "retaddraddr",
-                                          &RI);
+                                Intrinsic::addressofreturnaddress);
+  Value *UntypedAddrOfRetAddr = CallInst::Create(AddrOfRetAddrIntrin,
+                                                 "retaddraddr",
+                                                 &RI);
+  Value *AddrOfRetAddr = new BitCastInst(UntypedAddrOfRetAddr,
+                                         RetAddrTy->getPointerTo(),
+                                         "retaddraddr",
+                                         &RI);
+
   Value *RetAddr = new LoadInst(AddrOfRetAddr, "retaddr", &RI);
   // FIXME: addBitMasking and addLabelCheck expect a pointer, so we cast the
   // return address to a pointer. They should be changet to take integers.
