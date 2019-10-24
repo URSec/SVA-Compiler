@@ -25,16 +25,14 @@ class DataLayout;
 /// Instruments loads and stores to ensure that they do not access ghost memory
 /// or SVA's internal memory.
 class SFI : public PassInfoMixin<SFI>, public InstVisitor<SFI> {
-  #if 0
+  /// Location of secure memory.
+  static const constexpr uintptr_t StartGhostMemory = 0xffff860000000000UL;
+
   /// Mask to determine if we use the original value or the masked value.
-  static const uintptr_t checkMask = 0xffffff0000000000UL;
-  #else
-  /// Mask to determine if we use the original value or the masked value.
-  static const constexpr uintptr_t CheckMask = 0x0000000000fffffdUL;
-  #endif
+  static const constexpr uintptr_t CheckMask = StartGhostMemory >> 40;
 
   /// Mask to set proper lower-order bits.
-  static const constexpr uintptr_t SetMask   = 0x0000020000000000UL;
+  static const constexpr uintptr_t SetMask = 0x0000080000000000UL;
 
 public:
   /// Create a new SFI pass instance with parameters initialized from

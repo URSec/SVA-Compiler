@@ -16,7 +16,7 @@ define void @test_load() nounwind {
 
 ; CHECK-NEXT: %[[PTR:[[:alnum:]_.]+]] = call i32* @make_ptr()
 ; CHECK-NEXT: %[[INT_PTR:[[:alnum:]_.]+]] = ptrtoint i32* %[[PTR]] to i64
-; CHECK-NEXT: %[[NORMALIZED:[[:alnum:]_.]+]] = sub i64 %[[INT_PTR]], -3298534883328
+; CHECK-NEXT: %[[NORMALIZED:[[:alnum:]_.]+]] = sub i64 %[[INT_PTR]], -134140418588672
 ; CHECK-NEXT: %[[NORMALIZED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[NORMALIZED]] to i8*
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[NORMALIZED_PTR]], i32 0)
 ; CHECK-NEXT: %{{[[:alnum:]_.]+}} = load i32, i32* %[[PTR]]
@@ -31,7 +31,7 @@ define void @test_store() nounwind {
 
 ; CHECK-NEXT: %[[PTR:[[:alnum:]_.]+]] = call i32* @make_ptr()
 ; CHECK-NEXT: %[[INT_PTR:[[:alnum:]_.]+]] = ptrtoint i32* %[[PTR]] to i64
-; CHECK-NEXT: %[[NORMALIZED:[[:alnum:]_.]+]] = sub i64 %[[INT_PTR]], -3298534883328
+; CHECK-NEXT: %[[NORMALIZED:[[:alnum:]_.]+]] = sub i64 %[[INT_PTR]], -134140418588672
 ; CHECK-NEXT: %[[NORMALIZED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[NORMALIZED]] to i8*
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[NORMALIZED_PTR]], i32 0)
 ; CHECK-NEXT: store i32 0, i32* %[[PTR]]
@@ -46,7 +46,7 @@ define void @test_atomic_rmw() nounwind {
 
 ; CHECK-NEXT: %[[PTR:[[:alnum:]_.]+]] = call i32* @make_ptr()
 ; CHECK-NEXT: %[[INT_PTR:[[:alnum:]_.]+]] = ptrtoint i32* %[[PTR]] to i64
-; CHECK-NEXT: %[[NORMALIZED:[[:alnum:]_.]+]] = sub i64 %[[INT_PTR]], -3298534883328
+; CHECK-NEXT: %[[NORMALIZED:[[:alnum:]_.]+]] = sub i64 %[[INT_PTR]], -134140418588672
 ; CHECK-NEXT: %[[NORMALIZED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[NORMALIZED]] to i8*
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[NORMALIZED_PTR]], i32 0)
 ; CHECK-NEXT: atomicrmw add i32* %[[PTR]], i32 0 seq_cst
@@ -61,7 +61,7 @@ define void @test_atomic_cmpxchg() nounwind {
 
 ; CHECK-NEXT: %[[PTR:[[:alnum:]_.]+]] = call i32* @make_ptr()
 ; CHECK-NEXT: %[[INT_PTR:[[:alnum:]_.]+]] = ptrtoint i32* %[[PTR]] to i64
-; CHECK-NEXT: %[[NORMALIZED:[[:alnum:]_.]+]] = sub i64 %[[INT_PTR]], -3298534883328
+; CHECK-NEXT: %[[NORMALIZED:[[:alnum:]_.]+]] = sub i64 %[[INT_PTR]], -134140418588672
 ; CHECK-NEXT: %[[NORMALIZED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[NORMALIZED]] to i8*
 ; CHECK-NEXT: call void @llvm.x86.bndcl(i8* %[[NORMALIZED_PTR]], i32 0)
 ; CHECK-NEXT: cmpxchg i32* %[[PTR]], i32 0, i32 1 seq_cst seq_cst
