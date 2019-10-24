@@ -42,7 +42,7 @@ public:
   // FIXME: These are target-specific and should be queried from the target.
 
   /// Mask for the kernel address space.
-  static const constexpr uintptr_t KernelAddrSpaceMask = 0xffffffff80000000UL;
+  static const constexpr uintptr_t KernelAddrSpaceMask = 0xffff800000000000UL;
 
   /// CFI label value.
   ///

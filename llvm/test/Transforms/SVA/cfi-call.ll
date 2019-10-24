@@ -17,7 +17,7 @@ define void @test_call() nounwind noreturn {
 ; CHECK: %[[FN_PTR:[[:alnum:]_.]+]] = call void ()* @make_ptr()
 ; CHECK: %[[INT_PTR:[[:alnum:]_.]+]] = ptrtoint void ()* %[[FN_PTR]] to i64
 ; CHECK: %[[ALIGNED:[[:alnum:]_.]+]] = and i64 %[[INT_PTR]], -32
-; CHECK: %[[INT_MASKED:[[:alnum:]_.]+]] = or i64 %[[ALIGNED]], -2147483648
+; CHECK: %[[INT_MASKED:[[:alnum:]_.]+]] = or i64 %[[ALIGNED]], -140737488355328
 ; CHECK: %[[MASKED:[[:alnum:]_.]+]] = inttoptr i64 %[[INT_MASKED]] to void ()*
 ; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
