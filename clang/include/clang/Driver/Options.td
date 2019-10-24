@@ -1983,12 +1983,6 @@ def fsva_sfi : Flag<["-"], "fsva-sfi">,
 def fno_sva_sfi : Flag<["-"], "fno-sva-sfi">,
   Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Don't instrument the code with SVA's software fault isolation">;
-def fsva_protect_sva_mem : Flag<["-"], "fsva-protect-sva-mem">,
-  Group<f_Group>, Flags<[CC1Option]>,
-  HelpText<"Add extra checks to protect SVA's private memory region.">;
-def fno_sva_protect_sva_mem : Flag<["-"], "fno-sva-protect-sva-mem">,
-  Group<f_Group>, Flags<[CC1Option]>,
-  HelpText<"Don't add extra checks to protect SVA's private memory region.">;
 def fsva_use_cet : Flag<["-"], "fsva-use-cet">,
   Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Use Intel's CET extentions for SVA's control-flow integrity">;

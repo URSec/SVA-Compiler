@@ -351,8 +351,6 @@ LANGOPT(SVA_SFI, 1, 0, "Enable SVA's software fault isolation")
 LANGOPT(SVA_CHECK_LOADS, 1, 0,
   "Enable load instrumentation in SVA's software fault isolation")
 LANGOPT(SVA_MPX, 1, 0, "Use Intel MPX in SVA's software fault isolation")
-LANGOPT(SVA_PROTECT_SVA_MEM, 1, 0,
-  "Enable additional protections for SVA's private memory")
 
 #undef LANGOPT
 #undef COMPATIBLE_LANGOPT

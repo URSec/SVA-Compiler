@@ -41,17 +41,8 @@ class CFI : public PassInfoMixin<CFI> {
 public:
   // FIXME: These are target-specific and should be queried from the target.
 
-  /// Location of secure memory.
-  static const constexpr uintptr_t StartGhostMemory = 0xfffffd0000000000UL;
-
   /// Mask for the kernel address space.
   static const constexpr uintptr_t KernelAddrSpaceMask = 0xffffffff80000000UL;
-
-  /// Beginnig of SVA memory.
-  static const constexpr uintptr_t SVALowAddr = 0xffffffff819ef000UL;
-
-  /// End of SVA memory.
-  static const constexpr uintptr_t SVAHighAddr = 0xffffffff89b96060UL;
 
   /// CFI label value.
   ///
@@ -70,12 +61,10 @@ public:
 
   /// Create a new CFI pass instance with the specified configuration.
   ///
-  /// @param SVAMemChecks Whether or not to do extra checks to protect SVA's
-  ///                     private memory.
   /// @param UseMPX       Whether or not to implement checks with Intel MPX.
   /// @param UseCET       Whether or not to implement checks with Intel CET.
-  explicit CFI(bool SVAMemChecks, bool UseMPX, bool UseCET)
-    : SVAMemChecks(SVAMemChecks), UseMPX(UseMPX), UseCET(UseCET) { }
+  explicit CFI(bool UseMPX, bool UseCET)
+    : UseMPX(UseMPX), UseCET(UseCET) { }
 
   /// Run the CFI pass on the specified `Function`.
   ///
@@ -203,9 +192,6 @@ private:
   /// The basic block that we jump to on a CFI check failure.
   BasicBlock *ErrorBB = nullptr;
 
-  /// Whether or not to perform checks to protect SVA's private memory.
-  bool SVAMemChecks;
-
   /// Whether or not to implement checks with Intel MPX.
   bool UseMPX;
 
@@ -223,12 +209,10 @@ FunctionPass *createCFIPass();
 /// Create an instance of the CFI pass for the legacy pass maneger with the
 /// specified configuration.
 ///
-/// @param SVAMemChecks Whether or not to do extra checks to protect SVA's
-///                     private memory.
 /// @param UseMPX       Whether or not to implement checks with Intel MPX.
 /// @param UseCET       Whether or not to implement checks with Intel CET.
 /// @return             A new instance of the CFI pass.
-FunctionPass *createCFIPass(bool SVAMemChecks, bool UseMPX, bool UseCET);
+FunctionPass *createCFIPass(bool UseMPX, bool UseCET);
 
 /// Initialize and register the CFI pass.
 ///

@@ -5687,10 +5687,6 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                      options::OPT_fno_sva_check_loads, false)) {
       CmdArgs.push_back("-fsva-check-loads");
     }
-    if (Args.hasFlag(options::OPT_fsva_protect_sva_mem,
-                     options::OPT_fno_sva_protect_sva_mem, false)) {
-      CmdArgs.push_back("-fsva-protect-sva-mem");
-    }
   } else {
     for (const Arg* A : Args.filtered(options::OPT_fsva_cfi,
                                       options::OPT_fno_sva_cfi,
@@ -5701,9 +5697,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                                       options::OPT_fsva_use_mpx,
                                       options::OPT_fno_sva_use_mpx,
                                       options::OPT_fsva_check_loads,
-                                      options::OPT_fno_sva_check_loads,
-                                      options::OPT_fsva_protect_sva_mem,
-                                      options::OPT_fno_sva_protect_sva_mem)) {
+                                      options::OPT_fno_sva_check_loads)) {
       D.Diag(diag::err_drv_argument_only_allowed_with) << A->getAsString(Args)
                                                        << "-sva";
     }

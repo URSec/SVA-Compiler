@@ -349,14 +349,10 @@ static void addSVAPasses(const PassManagerBuilder &Builder,
   const LangOptions &LangOpts = BuilderWrapper.getLangOpts();
 
   if (LangOpts.SVA_CFI) {
-    PM.add(createCFIPass(LangOpts.SVA_PROTECT_SVA_MEM,
-                         LangOpts.SVA_MPX,
-                         LangOpts.SVA_CET));
+    PM.add(createCFIPass(LangOpts.SVA_MPX, LangOpts.SVA_CET));
   }
   if (LangOpts.SVA_SFI) {
-    PM.add(createSFIPass(LangOpts.SVA_CHECK_LOADS,
-                         LangOpts.SVA_PROTECT_SVA_MEM,
-                         LangOpts.SVA_MPX));
+    PM.add(createSFIPass(LangOpts.SVA_CHECK_LOADS, LangOpts.SVA_MPX));
   }
 }
 
@@ -1236,14 +1232,10 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
           [this](FunctionPassManager &FPM,
                  PassBuilder::OptimizationLevel Level) {
             if (LangOpts.SVA_CFI) {
-              FPM.addPass(CFI(LangOpts.SVA_PROTECT_SVA_MEM,
-                              LangOpts.SVA_MPX,
-                              LangOpts.SVA_CET));
+              FPM.addPass(CFI(LangOpts.SVA_MPX, LangOpts.SVA_CET));
             }
             if (LangOpts.SVA_SFI) {
-              FPM.addPass(SFI(LangOpts.SVA_CHECK_LOADS,
-                              LangOpts.SVA_PROTECT_SVA_MEM,
-                              LangOpts.SVA_MPX));
+              FPM.addPass(SFI(LangOpts.SVA_CHECK_LOADS, LangOpts.SVA_MPX));
             }
           });
       }
@@ -1295,15 +1287,11 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
       if (LangOpts.SVA) {
         if (LangOpts.SVA_CFI) {
           MPM.addPass(createModuleToFunctionPassAdaptor(
-                        CFI(LangOpts.SVA_PROTECT_SVA_MEM,
-                            LangOpts.SVA_MPX,
-                            LangOpts.SVA_CET)));
+                        CFI(LangOpts.SVA_MPX, LangOpts.SVA_CET)));
         }
         if (LangOpts.SVA_SFI) {
           MPM.addPass(createModuleToFunctionPassAdaptor(
-                        SFI(LangOpts.SVA_CHECK_LOADS,
-                            LangOpts.SVA_PROTECT_SVA_MEM,
-                            LangOpts.SVA_MPX)));
+                        SFI(LangOpts.SVA_CHECK_LOADS, LangOpts.SVA_MPX)));
         }
       }
     }

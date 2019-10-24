@@ -41,12 +41,6 @@ namespace {
 STATISTIC(CJChecks, "Call/Jump Instrumentation Added");
 }
 
-/// Command line option for enabling SVA Memory checks.
-static llvm::cl::opt<bool>
-DoSVAChecks("enable-cfi-svachecks",
-            llvm::cl::desc("Add special CFI checks for SVA Memory"),
-            llvm::cl::init(false));
-
 /// Command line option for enabling use of MPX for CFI.
 static llvm::cl::opt<bool>
 OptUseMPX("enable-mpx-cfi",
@@ -55,7 +49,7 @@ OptUseMPX("enable-mpx-cfi",
 
 namespace llvm {
 
-CFI::CFI() : CFI(DoSVAChecks, OptUseMPX, false) { }
+CFI::CFI() : CFI(OptUseMPX, false) { }
 
 // FIXME:
 //  Performing this check here really breaks the separation of concerns design
@@ -126,8 +120,6 @@ Value *CFI::addBitMasking(Value &Callee, Instruction &I) {
   } else {
     // Create the integer values used for bit-masking.
     Value *Mask = ConstantInt::get(IntPtrTy, KernelAddrSpaceMask);
-    Value *svaLow = ConstantInt::get(IntPtrTy, SVALowAddr);
-    Value *svaHigh = ConstantInt::get(IntPtrTy, SVAHighAddr);
 
     // Create instructions that create a version of the pointer with the proper
     // bits set.
@@ -141,32 +133,6 @@ Value *CFI::addBitMasking(Value &Callee, Instruction &I) {
                                     Callee.getType(),
                                     MaskedPointer->getName(),
                                     &I);
-
-    // Insert a special check to protect SVA memory.  Note that this is a hack
-    // that is used because the SVA memory isn't positioned after Ghost Memory
-    // like it should be as described in the Virtual Ghost and KCoFI papers.
-    if (SVAMemChecks) {
-      // Compare against the first and last SVA addresses.
-      Value *svaLCmp = new ICmpInst(&I,
-                                    CmpInst::ICMP_ULE,
-                                    svaLow,
-                                    MaskedPointer,
-                                    "svacmp");
-      Value *svaHCmp = new ICmpInst(&I,
-                                    CmpInst::ICMP_ULE,
-                                    MaskedPointer,
-                                    svaHigh,
-                                    "svacmp");
-      Value *InSVA = BinaryOperator::Create(Instruction::And,
-                                            svaLCmp,
-                                            svaHCmp,
-                                            "inSVA",
-                                            &I);
-
-      // Call `abort` instead if the target is in SVA memory.
-      Value *CastedAbort = castAbortTo(Callee.getType());
-      Final = SelectInst::Create(InSVA, CastedAbort, Final, "fptr", &I);
-    }
 
     return Final;
   }
@@ -372,8 +338,8 @@ public:
 
   LegacyCFI() : FunctionPass(ID), CFIPass() { }
 
-  LegacyCFI(bool SVAMemChecks, bool UseMPX, bool UseCET)
-    : FunctionPass(ID), CFIPass(SVAMemChecks, UseMPX, UseCET) { }
+  LegacyCFI(bool UseMPX, bool UseCET)
+    : FunctionPass(ID), CFIPass(UseMPX, UseCET) { }
 
   virtual bool runOnFunction(Function &F) override {
     // `abort` seems to get deleted from the module if we add it any earlier.
@@ -404,8 +370,8 @@ FunctionPass *llvm::createCFIPass() {
   return new LegacyCFI();
 }
 
-FunctionPass *llvm::createCFIPass(bool SVAMemChecks, bool UseMPX, bool UseCET) {
-  return new LegacyCFI(SVAMemChecks, UseMPX, UseCET);
+FunctionPass *llvm::createCFIPass(bool UseMPX, bool UseCET) {
+  return new LegacyCFI(UseMPX, UseCET);
 }
 
 INITIALIZE_PASS_BEGIN(LegacyCFI, DEBUG_TYPE, "SVA CFI instrumentation", false, false)

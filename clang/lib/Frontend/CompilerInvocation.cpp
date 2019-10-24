@@ -3303,7 +3303,6 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
   Opts.SVA_SFI = Args.hasArg(OPT_fsva_sfi);
   Opts.SVA_CHECK_LOADS = Args.hasArg(OPT_fsva_check_loads);
   Opts.SVA_MPX = Args.hasArg(OPT_fsva_use_mpx);
-  Opts.SVA_PROTECT_SVA_MEM = Args.hasArg(OPT_fsva_protect_sva_mem);
 
   Opts.CompleteMemberPointers = Args.hasArg(OPT_fcomplete_member_pointers);
   Opts.BuildingPCHWithObjectFile = Args.hasArg(OPT_building_pch_with_obj);

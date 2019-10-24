@@ -36,15 +36,6 @@ class SFI : public PassInfoMixin<SFI>, public InstVisitor<SFI> {
   /// Mask to set proper lower-order bits.
   static const constexpr uintptr_t SetMask   = 0x0000020000000000UL;
 
-  /// Location of secure memory.
-  static const constexpr uintptr_t StartGhostMemory = 0xfffffd0000000000UL;
-
-  /// Beginning of SVA memory.
-  static const constexpr uintptr_t StartSVAMemory = 0xffffffff819ef000UL;
-
-  /// End of SVA memory.
-  static const constexpr uintptr_t EndSVAMemory = 0xffffffff89b96060UL;
-
 public:
   /// Create a new SFI pass instance with parameters initialized from
   /// command-line options to LLVM.
@@ -53,11 +44,9 @@ public:
   /// Create a new SFI pass instance with the specified configuration.
   ///
   /// @param LoadChecks   Whether or not to perform checks on loads.
-  /// @param SVAMemChecks Whether or not to do extra checks to protect SVA's
-  //                      private memory.
   /// @param UseMPX       Whether or not to implement checks with Intel MPX.
-  explicit SFI(bool LoadChecks, bool SVAMemChecks, bool UseMPX)
-    : LoadChecks(LoadChecks), SVAMemChecks(SVAMemChecks), UseMPX(UseMPX) { }
+  explicit SFI(bool LoadChecks, bool UseMPX)
+    : LoadChecks(LoadChecks), UseMPX(UseMPX) { }
 
   /// Run the SFI pass on the specified function.
   ///
@@ -137,9 +126,6 @@ private:
   /// Whether or not to do checks on load instructions.
   bool LoadChecks;
 
-  /// Whether or not to do checks to prevent access to SVA's private memory.
-  bool SVAMemChecks;
-
   /// Whether or not to implement checks with Intel MPX.
   bool UseMPX;
 };
@@ -154,11 +140,9 @@ FunctionPass *createSFIPass();
 /// specified configuration.
 ///
 /// @param LoadChecks   Whether or not to perform checks on loads.
-/// @param SVAMemChecks Whether or not to do extra checks to protect SVA's
-///                     private memory.
 /// @param UseMPX       Whether or not to implement checks with Intel MPX.
 /// @return             A new instance of the SFI pass.
-FunctionPass *createSFIPass(bool LoadChecks, bool SVAMemChecks, bool UseMPX);
+FunctionPass *createSFIPass(bool LoadChecks, bool UseMPX);
 
 /// Initialize and register the SFI pass.
 ///

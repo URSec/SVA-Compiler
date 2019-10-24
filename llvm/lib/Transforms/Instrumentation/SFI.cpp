@@ -47,12 +47,6 @@ DoLoadChecks("enable-sfi-loadchecks",
              llvm::cl::desc("Add SFI checks to loads"),
              llvm::cl::init(false));
 
-/// Command line option for enabling SVA Memory checks.
-static llvm::cl::opt<bool>
-DoSVAChecks("enable-sfi-svachecks",
-            llvm::cl::desc("Add special SFI checks for SVA Memory"),
-            llvm::cl::init(false));
-
 /// Command line option for enabling use of MPX for SFI.
 static llvm::cl::opt<bool>
 OptUseMPX("enable-mpx-sfi",
@@ -61,7 +55,7 @@ OptUseMPX("enable-mpx-sfi",
 
 namespace llvm {
 
-SFI::SFI(): SFI(DoLoadChecks, DoSVAChecks, OptUseMPX) { }
+SFI::SFI(): SFI(DoLoadChecks, OptUseMPX) { }
 
 // FIXME:
 //  Performing this check here really breaks the separation of concerns design
@@ -163,8 +157,6 @@ Value &SFI::addBitMasking(Value &Pointer, Instruction &I) {
     Value *SetMask   = ConstantInt::get(IntPtrTy, SFI::SetMask);
     Value *Zero      = ConstantInt::get(IntPtrTy, 0u);
     Value *ShiftBits = ConstantInt::get(IntPtrTy, 40u);
-    Value *svaLow    = ConstantInt::get(IntPtrTy, StartSVAMemory);
-    Value *svaHigh   = ConstantInt::get(IntPtrTy, EndSVAMemory);
 
     // Convert the pointer into an integer and then shift the higher order bits
     // into the lower-half of the integer.  Bit-masking operations can use
@@ -197,33 +189,7 @@ Value &SFI::addBitMasking(Value &Pointer, Instruction &I) {
                                            "setMask",
                                            &I);
 
-    // Insert a special check to protect SVA memory.  Note that this is a hack
-    // that is used because the SVA memory isn't positioned after Ghost Memory
-    // like it should be as described in the Virtual Ghost and KCoFI papers.
-    Value *Final = Masked;
-    if (SVAMemChecks) {
-      // Compare against the first and last SVA addresses.
-      Value *svaLCmp = new ICmpInst(&I,
-                                    CmpInst::ICMP_ULE,
-                                    svaLow,
-                                    Masked,
-                                    "svacmp");
-      Value *svaHCmp = new ICmpInst(&I,
-                                    CmpInst::ICMP_ULE,
-                                    Masked,
-                                    svaHigh,
-                                    "svacmp");
-      Value *InSVA = BinaryOperator::Create(Instruction::And,
-                                            svaLCmp,
-                                            svaHCmp,
-                                            "inSVA",
-                                            &I);
-
-      // Select the correct value based on whether the pointer is in SVA memory.
-      Final = SelectInst::Create(InSVA, Zero, Masked, "fptr", &I);
-    }
-
-    return *(new IntToPtrInst(Final, Pointer.getType(), "masked", &I));
+    return *(new IntToPtrInst(Masked, Pointer.getType(), "masked", &I));
   }
 }
 
@@ -376,8 +342,8 @@ public:
 
   LegacySFI() : FunctionPass(ID), SFIPass() { }
 
-  LegacySFI(bool LoadChecks, bool SVAMemChecks, bool UseMPX)
-    : FunctionPass(ID), SFIPass(LoadChecks, SVAMemChecks, UseMPX) { }
+  LegacySFI(bool LoadChecks, bool UseMPX)
+    : FunctionPass(ID), SFIPass(LoadChecks, UseMPX) { }
 
   virtual bool runOnFunction(Function &F) override {
     //
@@ -422,10 +388,8 @@ FunctionPass *llvm::createSFIPass() {
   return new LegacySFI();
 }
 
-FunctionPass *llvm::createSFIPass(bool LoadChecks,
-                                  bool SVAMemChecks,
-                                  bool UseMPX) {
-  return new LegacySFI(LoadChecks, SVAMemChecks, UseMPX);
+FunctionPass *llvm::createSFIPass(bool LoadChecks, bool UseMPX) {
+  return new LegacySFI(LoadChecks, UseMPX);
 }
 
 INITIALIZE_PASS_BEGIN(LegacySFI, DEBUG_TYPE, "SVA SFI instrumentation", false, false)
