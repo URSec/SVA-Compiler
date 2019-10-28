@@ -8,7 +8,9 @@
 
 #include "X86MachineFunctionInfo.h"
 #include "X86RegisterInfo.h"
+#include "X86Subtarget.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
+#include "llvm/CodeGen/TargetRegisterInfo.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 
 using namespace llvm;
@@ -28,3 +30,16 @@ void X86MachineFunctionInfo::setRestoreBasePointer(const MachineFunction *MF) {
   }
 }
 
+int X86MachineFunctionInfo::initRAIndex(MachineFunction *MF) {
+  const X86RegisterInfo *TRI =
+    MF->getSubtarget<X86Subtarget>().getRegisterInfo();
+
+  if (ReturnAddrIndex == 0) {
+    // Set up a frame object for the return address.
+    unsigned int SlotSize = TRI->getSlotSize();
+    ReturnAddrIndex = MF->getFrameInfo()
+                        .CreateFixedObject(SlotSize, -(int64_t)SlotSize, false);
+  }
+
+  return ReturnAddrIndex;
+}

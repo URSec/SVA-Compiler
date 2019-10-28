@@ -163,6 +163,10 @@ static unsigned findDeadCallerSavedReg(MachineBasicBlock &MBB,
   case X86::RETQ:
   case X86::RETIL:
   case X86::RETIQ:
+  case X86::JMPRETL:
+  case X86::JMPRETQ:
+  case X86::JMPRETIL:
+  case X86::JMPRETIQ:
   case X86::TCRETURNdi:
   case X86::TCRETURNri:
   case X86::TCRETURNmi:

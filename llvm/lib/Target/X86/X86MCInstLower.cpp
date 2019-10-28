@@ -726,6 +726,17 @@ void X86MCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
     assert(OutMI.getNumOperands() == 1 && "Unexpected number of operands!");
     break;
 
+  case X86::JMPRETL:
+  case X86::JMPRETQ: {
+    unsigned int Opcode =
+      OutMI.getOpcode() == X86::JMPRETQ ? X86::JMP64r : X86::JMP32r;
+    MCOperand Target = OutMI.getOperand(0);
+    OutMI = MCInst();
+    OutMI.setOpcode(Opcode);
+    OutMI.addOperand(Target);
+    break;
+  }
+
   case X86::EH_RETURN:
   case X86::EH_RETURN64: {
     OutMI = MCInst();

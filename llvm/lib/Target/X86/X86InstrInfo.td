@@ -86,6 +86,7 @@ def SDTLockUnaryArithWithFlags : SDTypeProfile<1, 1, [SDTCisVT<0, i32>,
                                                       SDTCisPtrTy<1>]>;
 
 def SDTX86Ret     : SDTypeProfile<0, -1, [SDTCisVT<0, i32>]>;
+def SDTX86JmpRet  : SDTypeProfile<0, -1, [SDTCisVT<0, iAny>, SDTCisVT<1, i32>]>;
 
 def SDT_X86CallSeqStart : SDCallSeqStart<[SDTCisVT<0, i32>,
                                           SDTCisVT<1, i32>]>;
@@ -192,6 +193,8 @@ def X86cas16save_rbx : SDNode<"X86ISD::LCMPXCHG16_SAVE_RBX_DAG",
                                 SDNPMayStore, SDNPMayLoad, SDNPMemOperand]>;
 
 def X86retflag : SDNode<"X86ISD::RET_FLAG", SDTX86Ret,
+                        [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
+def X86jmpretflag : SDNode<"X86ISD::JMPRET_FLAG", SDTX86JmpRet,
                         [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 def X86iret : SDNode<"X86ISD::IRET", SDTX86Ret,
                         [SDNPHasChain, SDNPOptInGlue]>;

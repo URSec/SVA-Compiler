@@ -136,6 +136,7 @@ public:
 
   int getRAIndex() const { return ReturnAddrIndex; }
   void setRAIndex(int Index) { ReturnAddrIndex = Index; }
+  int initRAIndex(MachineFunction *MF);
 
   int getFAIndex() const { return FrameAddrIndex; }
   void setFAIndex(int Index) { FrameAddrIndex = Index; }

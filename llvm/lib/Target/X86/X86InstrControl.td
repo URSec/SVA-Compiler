@@ -55,6 +55,13 @@ let isTerminator = 1, isReturn = 1, isBarrier = 1,
   let isCodeGenOnly = 1 in
   def IRET : PseudoI<(outs), (ins i32imm:$adj), [(X86iret timm:$adj)]>;
   def RET  : PseudoI<(outs), (ins i32imm:$adj, variable_ops), [(X86retflag timm:$adj)]>;
+
+  def JMPRETIL : PseudoI<(outs), (ins GR32:$dst, i32imm:$adj, variable_ops),
+                         [(X86jmpretflag GR32:$dst, timm:$adj)]>;
+  def JMPRETIQ : PseudoI<(outs), (ins GR64:$dst, i32imm:$adj, variable_ops),
+                         [(X86jmpretflag GR64:$dst, timm:$adj)]>;
+  def JMPRETL  : PseudoI<(outs), (ins GR32:$dst, variable_ops), []>;
+  def JMPRETQ  : PseudoI<(outs), (ins GR64:$dst, variable_ops), []>;
 }
 
 // Unconditional branches.

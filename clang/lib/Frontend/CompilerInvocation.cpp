@@ -935,6 +935,7 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
   Opts.PIECopyRelocations =
       Args.hasArg(OPT_mpie_copy_relocations);
   Opts.NoPLT = Args.hasArg(OPT_fno_plt);
+  Opts.ForceJumpReturn = Args.hasArg(OPT_mjump_return);
   Opts.SaveTempLabels = Args.hasArg(OPT_msave_temp_labels);
   Opts.NoDwarfDirectoryAsm = Args.hasArg(OPT_fno_dwarf_directory_asm);
   Opts.SoftFloat = Args.hasArg(OPT_msoft_float);

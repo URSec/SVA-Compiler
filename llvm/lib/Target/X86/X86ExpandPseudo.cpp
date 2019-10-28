@@ -61,6 +61,7 @@ public:
 private:
   void ExpandICallBranchFunnel(MachineBasicBlock *MBB,
                                MachineBasicBlock::iterator MBBI);
+  bool AttemptConvertMovToPop(MachineBasicBlock::iterator MBBI);
 
   bool ExpandMI(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI);
   bool ExpandMBB(MachineBasicBlock &MBB);
@@ -171,6 +172,49 @@ void X86ExpandPseudo::ExpandICallBranchFunnel(
         .add(JTInst->getOperand(3 + 2 * P.second));
   }
   JTMBB->erase(JTInst);
+}
+
+bool X86ExpandPseudo::AttemptConvertMovToPop(MachineBasicBlock::iterator MBBI) {
+  MachineBasicBlock &MBB = *MBBI->getParent();
+  bool Is64Bit;
+
+  ++MBBI;
+  while (MBBI != MBB.begin()) {
+    MachineInstr &MI = *--MBBI;
+
+    if (MI.getOpcode() == X86::MOV64rm) {
+      Is64Bit = true;
+      break;
+    } else if (MI.getOpcode() == X86::MOV32rm) {
+      Is64Bit = false;
+      break;
+    } else if (MI.mayLoadOrStore() || MI.isBarrier() || MI.isTerminator() ||
+               MI.isCall() || MI.isBranch() || MI.hasUnmodeledSideEffects() ||
+               MI.readsRegister(X86::RSP, TRI) ||
+               MI.modifiesRegister(X86::RSP, TRI)) {
+      // Can't execute a pop before this instruction
+      return false;
+    }
+  }
+
+  MachineInstr &MI = *MBBI;
+
+  if ((MI.getOperand(1).getReg() != X86::RSP &&
+       MI.getOperand(1).getReg() != X86::ESP) ||
+      MI.getOperand(3).getReg() != X86::NoRegister ||
+      MI.getOperand(4).getImm() != 0 ||
+      MI.getOperand(5).getReg() != X86::NoRegister) {
+    // We can only convert loads from the stack pointer with no displacement
+    return false;
+  }
+
+  BuildMI(MBB, MBBI, MI.getDebugLoc(),
+          TII->get(Is64Bit ? X86::POP64r : X86::POP32r))
+      .add(MI.getOperand(0))
+      .setMIFlag(MachineInstr::FrameDestroy);
+  MI.eraseFromParent();
+
+  return true;
 }
 
 /// If \p MBBI is a pseudo instruction, this method expands
@@ -326,8 +370,31 @@ bool X86ExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
       BuildMI(MBB, MBBI, DL, TII->get(X86::PUSH32r)).addReg(X86::ECX);
       MIB = BuildMI(MBB, MBBI, DL, TII->get(X86::RETL));
     }
-    for (unsigned I = 1, E = MBBI->getNumOperands(); I != E; ++I)
+    for (unsigned I = 1, E = MBBI->getNumOperands(); I != E; ++I) {
       MIB.add(MBBI->getOperand(I));
+    }
+    MBB.erase(MBBI);
+    return true;
+  }
+  case X86::JMPRETIL:
+  case X86::JMPRETIQ: {
+    MachineInstrBuilder MIB;
+    int64_t StackAdj = MBBI->getOperand(1).getImm();
+
+    if (!AttemptConvertMovToPop(std::prev(MBBI))) {
+      StackAdj += STI->is64Bit() ? 8 : 4;
+    }
+
+    if (StackAdj > 0) {
+      X86FL->emitSPUpdate(MBB, MBBI, DL, StackAdj, /*InEpilogue=*/true);
+    }
+    MIB = BuildMI(MBB, MBBI, DL,
+                  TII->get(Opcode == X86::JMPRETIQ ?
+                           X86::JMPRETQ : X86::JMPRETL))
+              .addReg(MBBI->getOperand(0).getReg(), RegState::Kill);
+    for (unsigned I = 2, E = MBBI->getNumOperands(); I != E; ++I) {
+      MIB.add(MBBI->getOperand(I));
+    }
     MBB.erase(MBBI);
     return true;
   }

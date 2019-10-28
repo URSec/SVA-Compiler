@@ -2659,7 +2659,15 @@ X86TargetLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
   SDValue Flag;
   SmallVector<SDValue, 6> RetOps;
   RetOps.push_back(Chain); // Operand #0 = Chain (updated below)
-  // Operand #1 = Bytes To Pop
+  if (Subtarget.returnWithJump()) {
+    MVT RetAddrVT = MVT::getIntegerVT(Subtarget.is64Bit() ? 64 : 32);
+    SDValue RetAddrFI = getReturnAddressFrameIndex(DAG);
+    SDValue RetAddr = DAG.getLoad(RetAddrVT, dl, Chain, RetAddrFI,
+                                  MachinePointerInfo());
+    // Operand #1 = Return address
+    RetOps.push_back(RetAddr);
+  }
+  // Operand #1 (#2 if return with jump) = Bytes To Pop
   RetOps.push_back(DAG.getTargetConstant(FuncInfo->getBytesToPopOnReturn(), dl,
                    MVT::i32));
 
@@ -2832,8 +2840,11 @@ X86TargetLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
     RetOps.push_back(Flag);
 
   X86ISD::NodeType opcode = X86ISD::RET_FLAG;
-  if (CallConv == CallingConv::X86_INTR)
+  if (CallConv == CallingConv::X86_INTR) {
     opcode = X86ISD::IRET;
+  } else if (Subtarget.returnWithJump()) {
+    opcode = X86ISD::JMPRET_FLAG;
+  }
   return DAG.getNode(opcode, dl, MVT::Other, RetOps);
 }
 
@@ -4741,18 +4752,10 @@ static bool isTargetShuffleVariableMask(unsigned Opcode) {
 
 SDValue X86TargetLowering::getReturnAddressFrameIndex(SelectionDAG &DAG) const {
   MachineFunction &MF = DAG.getMachineFunction();
-  const X86RegisterInfo *RegInfo = Subtarget.getRegisterInfo();
   X86MachineFunctionInfo *FuncInfo = MF.getInfo<X86MachineFunctionInfo>();
-  int ReturnAddrIndex = FuncInfo->getRAIndex();
-
-  if (ReturnAddrIndex == 0) {
-    // Set up a frame object for the return address.
-    unsigned SlotSize = RegInfo->getSlotSize();
-    ReturnAddrIndex = MF.getFrameInfo().CreateFixedObject(SlotSize,
-                                                          -(int64_t)SlotSize,
-                                                          false);
-    FuncInfo->setRAIndex(ReturnAddrIndex);
-  }
+  int ReturnAddrIndex = FuncInfo->initRAIndex(&MF);
+  assert(ReturnAddrIndex != 0 &&
+         "Failed to set up frame index for return address");
 
   return DAG.getFrameIndex(ReturnAddrIndex, getPointerTy(DAG.getDataLayout()));
 }
@@ -29679,6 +29682,7 @@ const char *X86TargetLowering::getTargetNodeName(unsigned Opcode) const {
   case X86ISD::CMOV:               return "X86ISD::CMOV";
   case X86ISD::BRCOND:             return "X86ISD::BRCOND";
   case X86ISD::RET_FLAG:           return "X86ISD::RET_FLAG";
+  case X86ISD::JMPRET_FLAG:        return "X86ISD::JMPRET_FLAG";
   case X86ISD::IRET:               return "X86ISD::IRET";
   case X86ISD::REP_STOS:           return "X86ISD::REP_STOS";
   case X86ISD::REP_MOVS:           return "X86ISD::REP_MOVS";

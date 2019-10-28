@@ -288,6 +288,11 @@ static cl::opt<bool>
 static cl::opt<bool>
     SVA("sva", cl::desc("Enable SVA"), cl::init(false));
 
+static cl::opt<bool>
+    ForceJumpReturn("jump-return",
+                    cl::desc("Force return via indirect jump"),
+                    cl::init(false));
+
 // Common utility function tightly tied to the options listed here. Initializes
 // a TargetOptions object with CodeGen flags and returns it.
 static TargetOptions InitTargetOptionsFromCodeGenFlags() {
@@ -328,6 +333,8 @@ static TargetOptions InitTargetOptionsFromCodeGenFlags() {
   Options.DebuggerTuning = DebuggerTuningOpt;
 
   Options.SVA = SVA;
+
+  Options.ForceJumpReturn = ForceJumpReturn;
 
   return Options;
 }

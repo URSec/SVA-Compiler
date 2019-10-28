@@ -5608,6 +5608,10 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                                           << value;
   }
 
+  if (Args.hasFlag(options::OPT_mjump_return,
+                   options::OPT_mno_jump_return, false))
+    CmdArgs.push_back("-mjump-return");
+
   RenderDiagnosticsOptions(D, Args, CmdArgs);
 
   // -fno-asm-blocks is default.

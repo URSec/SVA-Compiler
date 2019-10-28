@@ -872,6 +872,10 @@ public:
   }
 
   bool enableAdvancedRASplitCost() const override { return true; }
+
+  bool returnWithJump() const {
+    return TM.Options.ForceJumpReturn;
+  }
 };
 
 } // end namespace llvm

@@ -121,6 +121,10 @@ namespace llvm {
       /// 1 is the number of bytes of stack to pop.
       RET_FLAG,
 
+      /// Return via indirect jump. Operand 0 is the chain operand, operand 1 is
+      /// the return address, operand 2 is the number of bytes of stack to pop.
+      JMPRET_FLAG,
+
       /// Return from interrupt. Operand 0 is the number of bytes to pop.
       IRET,
 

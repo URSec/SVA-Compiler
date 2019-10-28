@@ -499,6 +499,7 @@ static void initTargetOptions(llvm::TargetOptions &Options,
   Options.EnableDebugEntryValues = CodeGenOpts.EnableDebugEntryValues;
   Options.ForceDwarfFrameSection = CodeGenOpts.ForceDwarfFrameSection;
   Options.SVA = LangOpts.SVA;
+  Options.ForceJumpReturn = CodeGenOpts.ForceJumpReturn;
 
   Options.MCOptions.SplitDwarfFile = CodeGenOpts.SplitDwarfFile;
   Options.MCOptions.MCRelaxAll = CodeGenOpts.RelaxAll;

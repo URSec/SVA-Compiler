@@ -25,6 +25,7 @@
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
 #include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
+#include "llvm/CodeGen/MachineMemOperand.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/CallingConv.h"
@@ -1145,7 +1146,7 @@ bool X86FastISel::X86SelectStore(const Instruction *I) {
 bool X86FastISel::X86SelectRet(const Instruction *I) {
   const ReturnInst *Ret = cast<ReturnInst>(I);
   const Function &F = *I->getParent()->getParent();
-  const X86MachineFunctionInfo *X86MFInfo =
+  X86MachineFunctionInfo *X86MFInfo =
       FuncInfo.MF->getInfo<X86MachineFunctionInfo>();
 
   if (!FuncInfo.CanLowerReturn)
@@ -1275,13 +1276,47 @@ bool X86FastISel::X86SelectRet(const Instruction *I) {
 
   // Now emit the RET.
   MachineInstrBuilder MIB;
-  if (X86MFInfo->getBytesToPopOnReturn()) {
-    MIB = BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc,
-                  TII.get(Subtarget->is64Bit() ? X86::RETIQ : X86::RETIL))
-              .addImm(X86MFInfo->getBytesToPopOnReturn());
+  if (Subtarget->returnWithJump()) {
+      MachineRegisterInfo &MRI = FuncInfo.MF->getRegInfo();
+
+      // Load the return address from the stack
+      Register RetAddr =
+        MRI.createVirtualRegister(Subtarget->is64Bit() ?
+                                    &X86::GR64RegClass : &X86::GR32RegClass,
+                                  "return_address");
+      unsigned int RetAddrFI = X86MFInfo->initRAIndex(FuncInfo.MF);
+      assert(RetAddrFI != 0 && "No frame index for return address");
+      MachineMemOperand *MMO =
+        FuncInfo.MF->getMachineMemOperand(
+            MachinePointerInfo::getFixedStack(*FuncInfo.MF, RetAddrFI, 0),
+            MachineMemOperand::MOLoad,
+            Subtarget->is64Bit() ? 8 : 4,  // Size
+            Subtarget->is64Bit() ? 8 : 4); // Alignment
+      BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc,
+              TII.get(Subtarget->is64Bit() ? X86::MOV64rm : X86::MOV32rm),
+              RetAddr)
+          .addFrameIndex(RetAddrFI)
+          .addImm(1)
+          .addReg(X86::NoRegister)
+          .addImm(0)
+          .addReg(X86::NoRegister)
+          .addMemOperand(MMO);
+
+      // Return to the caller
+      MIB = BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc,
+                    TII.get(Subtarget->is64Bit() ?
+                              X86::JMPRETIQ : X86::JMPRETIL))
+                .addReg(RetAddr, RegState::Kill)
+                .addImm(X86MFInfo->getBytesToPopOnReturn());
   } else {
-    MIB = BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc,
-                  TII.get(Subtarget->is64Bit() ? X86::RETQ : X86::RETL));
+    if (X86MFInfo->getBytesToPopOnReturn()) {
+      MIB = BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc,
+                    TII.get(Subtarget->is64Bit() ? X86::RETIQ : X86::RETIL))
+                .addImm(X86MFInfo->getBytesToPopOnReturn());
+    } else {
+      MIB = BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc,
+                    TII.get(Subtarget->is64Bit() ? X86::RETQ : X86::RETL));
+    }
   }
   for (unsigned i = 0, e = RetRegs.size(); i != e; ++i)
     MIB.addReg(RetRegs[i], RegState::Implicit);
