@@ -25114,6 +25114,17 @@ SDValue X86TargetLowering::LowerRETURNADDR(SDValue Op,
                      MachinePointerInfo());
 }
 
+SDValue X86TargetLowering::LowerSETRETURNADDR(SDValue Op,
+                                              SelectionDAG &DAG) const {
+  MachineFrameInfo &MFI = DAG.getMachineFunction().getFrameInfo();
+  MFI.setReturnAddressIsTaken(true);
+
+  SDLoc dl(Op);
+  SDValue RetAddrFI = getReturnAddressFrameIndex(DAG);
+  return DAG.getStore(Op.getOperand(0), dl, Op.getOperand(1), RetAddrFI,
+                      MachinePointerInfo());
+}
+
 SDValue X86TargetLowering::LowerADDROFRETURNADDR(SDValue Op,
                                                  SelectionDAG &DAG) const {
   DAG.getMachineFunction().getFrameInfo().setReturnAddressIsTaken(true);
@@ -28656,6 +28667,7 @@ SDValue X86TargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   case ISD::INTRINSIC_VOID:
   case ISD::INTRINSIC_W_CHAIN:  return LowerINTRINSIC_W_CHAIN(Op, Subtarget, DAG);
   case ISD::RETURNADDR:         return LowerRETURNADDR(Op, DAG);
+  case ISD::SETRETURNADDR:      return LowerSETRETURNADDR(Op, DAG);
   case ISD::ADDROFRETURNADDR:   return LowerADDROFRETURNADDR(Op, DAG);
   case ISD::FRAMEADDR:          return LowerFRAMEADDR(Op, DAG);
   case ISD::FRAME_TO_ARGS_OFFSET:

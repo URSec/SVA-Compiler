@@ -122,6 +122,7 @@ std::string SDNode::getOperationName(const SelectionDAG *G) const {
   case ISD::JumpTable:                  return "JumpTable";
   case ISD::GLOBAL_OFFSET_TABLE:        return "GLOBAL_OFFSET_TABLE";
   case ISD::RETURNADDR:                 return "RETURNADDR";
+  case ISD::SETRETURNADDR:              return "SETRETURNADDR";
   case ISD::ADDROFRETURNADDR:           return "ADDROFRETURNADDR";
   case ISD::FRAMEADDR:                  return "FRAMEADDR";
   case ISD::SPONENTRY:                  return "SPONENTRY";

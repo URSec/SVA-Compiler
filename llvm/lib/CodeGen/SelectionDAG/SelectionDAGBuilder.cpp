@@ -5806,6 +5806,14 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
                              TLI.getPointerTy(DAG.getDataLayout()),
                              getValue(I.getArgOperand(0))));
     return;
+  case Intrinsic::setreturnaddress: {
+    SDValue Chain = getControlRoot();
+    Res = DAG.getNode(ISD::SETRETURNADDR, sdl, MVT::Other,
+                      Chain, getValue(I.getArgOperand(0)));
+    setValue(&I, Res);
+    DAG.setRoot(Res);
+    return;
+  }
   case Intrinsic::addressofreturnaddress:
     setValue(&I, DAG.getNode(ISD::ADDROFRETURNADDR, sdl,
                              TLI.getPointerTy(DAG.getDataLayout())));
