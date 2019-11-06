@@ -129,6 +129,10 @@ FunctionPass *createX86DiscriminateMemOpsPass();
 /// This pass applies profiling information to insert cache prefetches.
 FunctionPass *createX86InsertPrefetchPass();
 
+/// This pass optimizes loads from and stores to the return address's frame
+/// index for jump returns.
+FunctionPass *createX86OptimizeJumpReturnAddressPass();
+
 InstructionSelector *createX86InstructionSelector(const X86TargetMachine &TM,
                                                   X86Subtarget &,
                                                   X86RegisterBankInfo &);
@@ -150,6 +154,7 @@ void initializeX86ExpandPseudoPass(PassRegistry &);
 void initializeX86FlagsCopyLoweringPassPass(PassRegistry &);
 void initializeX86OptimizeLEAPassPass(PassRegistry &);
 void initializeX86SpeculativeLoadHardeningPassPass(PassRegistry &);
+void initializeX86OptimizeJumpReturnAddressPass(PassRegistry &);
 
 namespace X86AS {
 enum : unsigned {

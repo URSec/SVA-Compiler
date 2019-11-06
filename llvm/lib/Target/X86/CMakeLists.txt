@@ -55,6 +55,7 @@ set(sources
   X86MachineFunctionInfo.cpp
   X86MacroFusion.cpp
   X86OptimizeLEAs.cpp
+  X86OptimizeJumpReturnAddress.cpp
   X86PadShortFunction.cpp
   X86RegisterBankInfo.cpp
   X86RegisterInfo.cpp
