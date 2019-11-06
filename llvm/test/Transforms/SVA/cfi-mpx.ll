@@ -69,8 +69,7 @@ define void @test_return_void() nounwind {
 ; CHECK: %[[ALIGNED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[ALIGNED]] to i8*
 ; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
-; CHECK: %[[NEW_RET_ADDR:[[:alnum:]_.]+]] = ptrtoint i8* %[[ALIGNED_PTR]] to i64
-; CHECK: store i64 %[[NEW_RET_ADDR]], i64* %{{[[:alnum:]_.]+}}
+; CHECK: call void @llvm.setreturnaddress(i8* %[[ALIGNED_PTR]])
 ; CHECK: ret void
     ret void
 
@@ -89,8 +88,7 @@ define i32 @test_return_value() nounwind {
 ; CHECK: %[[ALIGNED_PTR:[[:alnum:]_.]+]] = inttoptr i64 %[[ALIGNED]] to i8*
 ; CHECK: %[[HAS_LABEL:[[:alnum:]_.]+]] = icmp eq i32 -98693133, %{{[[:alnum:]_.]+}}
 ; CHECK: br i1 %[[HAS_LABEL]], label %{{[[:alnum:]_.]+}}, label %cfi_check_fail
-; CHECK: %[[NEW_RET_ADDR:[[:alnum:]_.]+]] = ptrtoint i8* %[[ALIGNED_PTR]] to i64
-; CHECK: store i64 %[[NEW_RET_ADDR]], i64* %{{[[:alnum:]_.]+}}
+; CHECK: call void @llvm.setreturnaddress(i8* %[[ALIGNED_PTR]])
 ; CHECK: ret i32 0
     ret i32 0
 

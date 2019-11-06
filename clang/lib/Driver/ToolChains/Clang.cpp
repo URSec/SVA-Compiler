@@ -5673,6 +5673,11 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (Args.hasFlag(options::OPT_sva, options::OPT_no_sva, false)) {
     CmdArgs.push_back("-sva");
 
+    if (!Args.hasArgNoClaim(options::OPT_mjump_return) &&
+        !Args.hasArgNoClaim(options::OPT_mno_jump_return)) {
+      CmdArgs.push_back("-mjump-return");
+    }
+
     if (Args.hasFlag(options::OPT_fsva_cfi, options::OPT_fno_sva_cfi, true)) {
       CmdArgs.push_back("-fsva-cfi");
     }

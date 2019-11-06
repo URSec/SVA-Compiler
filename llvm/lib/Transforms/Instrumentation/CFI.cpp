@@ -213,37 +213,21 @@ CFI::visitCallBase(CallBase &CI) {
 llvm::Optional<std::pair<BasicBlock*, BasicBlock::iterator>>
 CFI::visitReturnInst(ReturnInst &RI) {
   LLVMContext& Ctx = RI.getContext();
-  const DataLayout& DL = RI.getModule()->getDataLayout();
 
-  Type *RetAddrTy = getReturnAddrTy(Ctx, DL);
-  Function *AddrOfRetAddrIntrin
+  Function *RetAddrIntrin
     = Intrinsic::getDeclaration(RI.getModule(),
-                                Intrinsic::addressofreturnaddress);
-  Value *UntypedAddrOfRetAddr = CallInst::Create(AddrOfRetAddrIntrin,
-                                                 "retaddraddr",
-                                                 &RI);
-  Value *AddrOfRetAddr = new BitCastInst(UntypedAddrOfRetAddr,
-                                         RetAddrTy->getPointerTo(),
-                                         "retaddraddr",
-                                         &RI);
+                                Intrinsic::returnaddress);
+  Function *SetRetAddrIntrin
+    = Intrinsic::getDeclaration(RI.getModule(),
+                                Intrinsic::setreturnaddress);
+  Value *Zero = ConstantInt::get(Type::getInt32Ty(Ctx), 0);
 
-  Value *RetAddr = new LoadInst(AddrOfRetAddr, "retaddr", &RI);
-  // FIXME: addBitMasking and addLabelCheck expect a pointer, so we cast the
-  // return address to a pointer. They should be changet to take integers.
-  Value *RetAddrAsPtr = new IntToPtrInst(RetAddr,
-                                         Type::getInt8PtrTy(Ctx),
-                                         "retaddrasptr",
-                                         &RI);
-  Value *MaskedReturn = addBitMasking(*RetAddrAsPtr, RI);
-  auto Next = addLabelCheck(*MaskedReturn, RI);
+  Value *RetAddr =
+    CallInst::Create(RetAddrIntrin, { Zero }, "returnaddress", &RI);
+  Value *MaskedRetAddr = addBitMasking(*RetAddr, RI);
+  auto Next = addLabelCheck(*MaskedRetAddr, RI);
 
-  // See FIXME above about casting return address to pointer
-  Value *CastedMaskedReturn = new PtrToIntInst(MaskedReturn,
-                                               RetAddrTy,
-                                               "checkedretaddr",
-                                               &RI);
-
-  new StoreInst(CastedMaskedReturn, AddrOfRetAddr, &RI);
+  CallInst::Create(SetRetAddrIntrin, { MaskedRetAddr }, "", &RI);
 
   return Next;
 }
