@@ -348,11 +348,11 @@ static void addSVAPasses(const PassManagerBuilder &Builder,
       static_cast<const PassManagerBuilderWrapper&>(Builder);
   const LangOptions &LangOpts = BuilderWrapper.getLangOpts();
 
-  if (LangOpts.SVA_CFI) {
-    PM.add(createCFIPass(LangOpts.SVA_MPX, LangOpts.SVA_CET));
-  }
   if (LangOpts.SVA_SFI) {
     PM.add(createSFIPass(LangOpts.SVA_CHECK_LOADS, LangOpts.SVA_MPX));
+  }
+  if (LangOpts.SVA_CFI) {
+    PM.add(createCFIPass(LangOpts.SVA_MPX, LangOpts.SVA_CET));
   }
 }
 
@@ -1232,11 +1232,11 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
         PB.registerOptimizerLastEPCallback(
           [this](FunctionPassManager &FPM,
                  PassBuilder::OptimizationLevel Level) {
-            if (LangOpts.SVA_CFI) {
-              FPM.addPass(CFI(LangOpts.SVA_MPX, LangOpts.SVA_CET));
-            }
             if (LangOpts.SVA_SFI) {
               FPM.addPass(SFI(LangOpts.SVA_CHECK_LOADS, LangOpts.SVA_MPX));
+            }
+            if (LangOpts.SVA_CFI) {
+              FPM.addPass(CFI(LangOpts.SVA_MPX, LangOpts.SVA_CET));
             }
           });
       }
@@ -1286,13 +1286,13 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
     if (CodeGenOpts.OptimizationLevel == 0) {
       addSanitizersAtO0(MPM, TargetTriple, LangOpts, CodeGenOpts);
       if (LangOpts.SVA) {
-        if (LangOpts.SVA_CFI) {
-          MPM.addPass(createModuleToFunctionPassAdaptor(
-                        CFI(LangOpts.SVA_MPX, LangOpts.SVA_CET)));
-        }
         if (LangOpts.SVA_SFI) {
           MPM.addPass(createModuleToFunctionPassAdaptor(
                         SFI(LangOpts.SVA_CHECK_LOADS, LangOpts.SVA_MPX)));
+        }
+        if (LangOpts.SVA_CFI) {
+          MPM.addPass(createModuleToFunctionPassAdaptor(
+                        CFI(LangOpts.SVA_MPX, LangOpts.SVA_CET)));
         }
       }
     }
