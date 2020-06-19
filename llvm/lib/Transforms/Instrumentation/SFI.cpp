@@ -45,7 +45,7 @@ STATISTIC(LSChecks, "Load/Store Instrumentation Added");
 static llvm::cl::opt<bool>
 DoLoadChecks("enable-sfi-loadchecks",
              llvm::cl::desc("Add SFI checks to loads"),
-             llvm::cl::init(false));
+             llvm::cl::init(true));
 
 /// Command line option for enabling use of MPX for SFI.
 static llvm::cl::opt<bool>

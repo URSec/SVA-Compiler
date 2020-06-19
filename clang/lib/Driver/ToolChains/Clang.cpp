@@ -5693,7 +5693,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       CmdArgs.push_back("-fsva-use-mpx");
     }
     if (Args.hasFlag(options::OPT_fsva_check_loads,
-                     options::OPT_fno_sva_check_loads, false)) {
+                     options::OPT_fno_sva_check_loads, true)) {
       CmdArgs.push_back("-fsva-check-loads");
     }
   } else {
