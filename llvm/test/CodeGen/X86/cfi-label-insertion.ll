@@ -38,7 +38,9 @@ define void()* @dummy(i8) nounwind uwtable {
 define void @test_call() nounwind uwtable {
 ; CHECK-LABEL: test_call:
 
-; CHECK: callq not_defined_here
+; CHECK: .bundle_lock align_to_end
+; CHECK-NEXT: callq not_defined_here
+; CHECK-NEXT: .bundle_unlock
 ; CHECK-NEXT: endbr64
   call void @not_defined_here()
   ret void

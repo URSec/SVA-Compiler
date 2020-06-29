@@ -22,6 +22,7 @@
 #include "llvm/MC/MCFixupKindInfo.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCInstPrinter.h"
+#include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCRegister.h"
@@ -79,6 +80,10 @@ public:
         InstPrinter->setCommentStream(CommentStream);
     if (Assembler->getBackendPtr())
       setAllowAutoPadding(Assembler->getBackend().allowAutoPadding());
+    if (Context.sva()) {
+      // TODO: The alignment amount should be target-dependent
+      EmitBundleAlignMode(5);
+    }
   }
 
   MCAssembler &getAssembler() { return *Assembler; }
@@ -1933,6 +1938,9 @@ void MCAsmStreamer::AddEncodingComment(const MCInst &Inst,
 
 void MCAsmStreamer::EmitInstruction(const MCInst &Inst,
                                     const MCSubtargetInfo &STI) {
+  const MCContext &Ctx = getContext();
+  const MCInstrInfo &MII = *Ctx.getInstrInfo();
+
   assert(getCurrentSectionOnly() &&
          "Cannot emit contents before setting section!");
 
@@ -1945,6 +1953,12 @@ void MCAsmStreamer::EmitInstruction(const MCInst &Inst,
     GetCommentOS() << "\n";
   }
 
+  bool NeedsBundleLock = Ctx.sva() && MII.get(Inst.getOpcode()).isCall();
+
+  if (NeedsBundleLock) {
+    EmitBundleLock(/* AlignToEnd */ true);
+  }
+
   if(getTargetStreamer())
     getTargetStreamer()->prettyPrintAsm(*InstPrinter, 0, Inst, STI, OS);
   else
@@ -1955,6 +1969,10 @@ void MCAsmStreamer::EmitInstruction(const MCInst &Inst,
     GetCommentOS() << "\n";
 
   EmitEOL();
+
+  if (NeedsBundleLock) {
+    EmitBundleUnlock();
+  }
 }
 
 void MCAsmStreamer::EmitBundleAlignMode(unsigned AlignPow2) {
