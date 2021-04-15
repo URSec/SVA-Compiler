@@ -293,6 +293,12 @@ static cl::opt<bool>
                     cl::desc("Force return via indirect jump"),
                     cl::init(false));
 
+static cl::opt<bool>
+    SplitStack("split-stack",
+               cl::desc("Split return addresses and callee-saved registers"
+                        " onto a separate stack"),
+               cl::init(false));
+
 // Common utility function tightly tied to the options listed here. Initializes
 // a TargetOptions object with CodeGen flags and returns it.
 static TargetOptions InitTargetOptionsFromCodeGenFlags() {
@@ -335,6 +341,7 @@ static TargetOptions InitTargetOptionsFromCodeGenFlags() {
   Options.SVA = SVA;
 
   Options.ForceJumpReturn = ForceJumpReturn;
+  Options.SplitStack = SplitStack;
 
   return Options;
 }

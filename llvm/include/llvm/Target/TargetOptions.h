@@ -120,7 +120,7 @@ namespace llvm {
           EmitStackSizeSection(false), EnableMachineOutliner(false),
           SupportsDefaultOutlining(false), EmitAddrsig(false),
           EnableDebugEntryValues(false), ForceDwarfFrameSection(false),
-          SVA(false), ForceJumpReturn(false) {}
+          SVA(false), ForceJumpReturn(false), SplitStack(false) {}
 
     /// PrintMachineCode - This flag is enabled when the -print-machineinstrs
     /// option is specified on the command line, and should enable debugging
@@ -270,6 +270,9 @@ namespace llvm {
     /// instruction which pops its target address from the stack. On platforms
     /// that normally use an indirect jump for return, this has no effect.
     unsigned ForceJumpReturn : 1;
+
+    /// Split return addresses and callee-saved registers onto a separate stack.
+    unsigned SplitStack : 1;
 
     /// FloatABIType - This setting is set by -float-abi=xxx option is specfied
     /// on the command line. This setting may either be Default, Soft, or Hard.
