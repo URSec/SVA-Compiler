@@ -2493,6 +2493,10 @@ def mjump_return : Flag<["-"], "mjump-return">, Group<m_Group>,
   HelpText<"Force return via indirect jump">, Flags<[CC1Option]>;
 def mno_jump_return : Flag<["-"], "mno-jump-return">, Group<m_Group>,
   HelpText<"Don't force return via indirect jump">, Flags<[CC1Option]>;
+def msplit_stack : Flag<["-"], "msplit-stack">, Group<m_Group>, Flags<[CC1Option]>,
+  HelpText<"Split return addresses and callee-saved registers onto a separate stack">;
+def mno_split_stack : Flag<["-"], "mno-split-stack">, Group<m_Group>, Flags<[CC1Option]>,
+  HelpText<"Don't split return addresses and callee-saved registers onto a separate stack">;
 def moslib_EQ : Joined<["-"], "moslib=">, Group<m_Group>;
 def mpascal_strings : Flag<["-"], "mpascal-strings">, Alias<fpascal_strings>;
 def mred_zone : Flag<["-"], "mred-zone">, Group<m_Group>;

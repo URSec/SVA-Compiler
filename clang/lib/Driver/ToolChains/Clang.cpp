@@ -5612,6 +5612,10 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                    options::OPT_mno_jump_return, false))
     CmdArgs.push_back("-mjump-return");
 
+  if (Args.hasFlag(options::OPT_msplit_stack,
+                   options::OPT_mno_split_stack, false))
+    CmdArgs.push_back("-msplit-stack");
+
   RenderDiagnosticsOptions(D, Args, CmdArgs);
 
   // -fno-asm-blocks is default.

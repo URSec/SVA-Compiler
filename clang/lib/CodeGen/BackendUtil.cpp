@@ -500,6 +500,7 @@ static void initTargetOptions(llvm::TargetOptions &Options,
   Options.ForceDwarfFrameSection = CodeGenOpts.ForceDwarfFrameSection;
   Options.SVA = LangOpts.SVA;
   Options.ForceJumpReturn = CodeGenOpts.ForceJumpReturn;
+  Options.SplitStack = CodeGenOpts.SplitStack;
 
   Options.MCOptions.SplitDwarfFile = CodeGenOpts.SplitDwarfFile;
   Options.MCOptions.MCRelaxAll = CodeGenOpts.RelaxAll;
