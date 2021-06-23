@@ -64,6 +64,14 @@ X86RegisterInfo::X86RegisterInfo(const Triple &TT)
     StackPtr = Use64BitReg ? X86::RSP : X86::ESP;
     FramePtr = Use64BitReg ? X86::RBP : X86::EBP;
     BasePtr = Use64BitReg ? X86::RBX : X86::EBX;
+
+    // SVA: In the split-stack config, we use RBX as the stack pointer for
+    // the unprotected stack (RSP continues to be used for the protected call
+    // stack).
+    //
+    // Note that this is incompatible with using RBX as a BasePtr; we prevent
+    // that combination with a check in X86RegisterInfo::getReservedRegs().
+    SplitStackPtr = X86::RBX;
   } else {
     SlotSize = 4;
     StackPtr = X86::ESP;
@@ -544,6 +552,22 @@ BitVector X86RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   if (TFI->hasFP(MF)) {
     for (const MCPhysReg &SubReg : subregs_inclusive(X86::RBP))
       Reserved.set(SubReg);
+  }
+
+  // SVA: If split stack is enabled, ensure the stack pointer for the
+  // unprotected stack (RBX) is reserved.
+  //
+  // This use of RBX is incompatible with its use as a base pointer, so we
+  // will throw an error if a base pointer is also to be used.
+  if (MF.getTarget().Options.SplitStack) {
+    unsigned SplitStackReg = getSplitStackRegister();
+    for (const MCPhysReg &SubReg : subregs_inclusive(SplitStackReg))
+      Reserved.set(SubReg);
+
+    if (SplitStackPtr == getBaseRegister() && hasBasePointer(MF))
+      report_fatal_error(
+          "SplitStack is not supported for functions which require a BasePtr "
+          "(since they both require RBX to be free for different purposes).");
   }
 
   // Set the base-pointer register and its aliases as reserved if needed.

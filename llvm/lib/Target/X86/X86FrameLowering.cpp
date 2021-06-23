@@ -1223,6 +1223,36 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
     }
   }
 
+  // SVA: Determine the amount by which we need to decrement the unprotected
+  // (RBX) stack pointer.
+  //
+  // For now, we will keep this simple by decrementing both stack pointers
+  // (protected on RSP, unprotected on RBX) by the same amount; namely, by
+  // the amount which we would normally decrement the single stack pointer in
+  // non-split mode.
+  //
+  // This avoids the need to adjust the offsets used for accessing stack
+  // objects based on which and how many slots "moved" from the protected to
+  // the unprotected stack.
+  //
+  // The tradeoff is that there is a bit of wasted space (2x) because in
+  // reality, each stack object lives on one and only one stack, making its
+  // slot in the other stack redundant.
+  //
+  // This should not be a major issue in practice (at least for the purposes
+  // of our Xen port to SVA) because Xen's stack is already hard-limited to a
+  // size that is miniscule on modern machines (8 kB), so the impact on
+  // physical memory usage is negligible. The worst it could do is have a
+  // slight negative impact on cache locality for stack objects. There is
+  // also no negative impact from a virtual memory allocation/layout
+  // perspective, because the protected stack is allocated from unmapped
+  // physical memory by SVA and accessed through SVA's direct map.
+  //
+  // N.B.: We do this before the call to mergeSPUpdates() because the merging
+  // only affects the RSP stack (it relates to stack-passed function
+  // arguments, which we pass on the protected stack).
+  uint64_t UnprStackDecSize = NumBytes;
+
   // If there is an SUB32ri of ESP immediately before this instruction, merge
   // the two. This can be the case when tail call elimination is enabled and
   // the callee has more arguments then the caller.
@@ -1304,6 +1334,45 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
     }
   } else if (NumBytes) {
     emitSPUpdate(MBB, MBBI, DL, -(int64_t)NumBytes, /*InEpilogue=*/false);
+  }
+
+  // SVA: Decrement the unprotected (RBX) stack pointer as well.
+  //    RBX -= UnprStackDecSize
+  if (UnprStackDecSize && MF.getTarget().Options.SplitStack) {
+    // Things we don't want to have to deal with...
+    // (They might not actually be a problem to support if we wanted to, but
+    // this way I don't have to worry about understanding how what we're
+    // doing interacts with those code branches.)
+    assert(!IsWin64Prologue && !IsFunclet &&
+        "Windows platform and funclets not supported with SVA split stack.");
+    assert(Is64Bit &&
+        "SVA split stack only supported on 64-bit platforms.");
+    assert(!MFI.hasVarSizedObjects() &&
+        "Variable-sized stack objects not supported with SVA split stack.");
+
+    // Code prior to this point in the epilogue (callee-saved register pushes
+    // and RSP decrement) shouldn't be using RFLAGS as an input, so as long
+    // as the block itself doesn't have RFLAGS as a live-in we should be safe
+    // to use a SUB instruction for this. (Avoids complicated special-case
+    // code similar to that in BuildstackAdjustment() to fall back to LEA in
+    // such cases.)
+    assert(!MBB.isLiveIn(X86::EFLAGS) &&
+        "Cannot use SUB to decrement unprotected (RBX) stack pointer because "
+        "RFLAGS is live-in to the prologue BB. This shouldn't happen in a "
+        "sane calling convention.");
+    // Xen's stack is limited to 8 kB for implementation reasons, so we
+    // should never need to make a stack adjustment that's too big for a
+    // 32-bit immediate operand.
+    assert(UnprStackDecSize < ((1LL << 31) - 1) &&
+        "Stack adjustment too big (>2^32-1) to use ADD/SUB64ri.");
+
+    Register SplitStackReg = TRI->getSplitStackRegister();
+
+    unsigned Opc = getSUBriOpcode(true /* is 64-bit */, UnprStackDecSize);
+    auto MI = BuildMI(MBB, MBBI, DL, TII.get(Opc), SplitStackReg)
+      .addReg(SplitStackReg)
+      .addImm(UnprStackDecSize);
+    MI->getOperand(3).setIsDead(); // The RFLAGS implicit def is dead.
   }
 
   if (NeedsWinCFI && NumBytes) {
@@ -1675,6 +1744,14 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
   if (MBBI != MBB.end())
     DL = MBBI->getDebugLoc();
 
+  // SVA: Determine the size by which we need to increment the unprotected
+  // (RBX) stack pointer.
+  //
+  // As in emitPrologue(), we currently use the same value as for the
+  // protected (RSP) stack, not including the result of the call to
+  // mergeSPUpdates() below.
+  uint64_t UnprStackIncSize = NumBytes;
+
   // If there is an ADD32ri or SUB32ri of ESP immediately before this
   // instruction, merge the two instructions.
   if (NumBytes || MFI.hasVarSizedObjects())
@@ -1718,6 +1795,33 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
       BuildCFI(MBB, MBBI, DL, MCCFIInstruction::createDefCfaOffset(
                                   nullptr, -CSSize - SlotSize));
     }
+    --MBBI;
+  }
+
+  // SVA: Increment the unprotected (RBX) stack pointer as well.
+  //    RBX += UnprStackIncSize
+  if (UnprStackIncSize && MF.getTarget().Options.SplitStack) {
+    // RFLAGS shouldn't be live-in to any code from here to the end of the
+    // basic block (and the function), but check it just in case since we're
+    // about to clobber it with an ADD.
+    assert(!flagsNeedToBePreservedBeforeTheTerminators(MBB) &&
+        "Cannot use ADD to increment unprotected (RBX) stack pointer because "
+        "RFLAGS is live-in to the epilogue terminator. This shouldn't happen "
+        "in a sane calling convention.");
+    // Xen's stack is limited to 8 kB for implementation reasons, so we
+    // should never need to make a stack adjustment that's too big for a
+    // 32-bit immediate operand.
+    assert(UnprStackIncSize < ((1LL << 31) - 1) &&
+        "Stack adjustment too big (>2^32-1) to use ADD/SUB64ri.");
+
+    Register SplitStackReg = TRI->getSplitStackRegister();
+
+    unsigned Opc = getADDriOpcode(true /* is 64-bit */, UnprStackIncSize);
+    auto MI = BuildMI(MBB, MBBI, DL, TII.get(Opc), SplitStackReg)
+      .addReg(SplitStackReg)
+      .addImm(UnprStackIncSize);
+    MI->getOperand(3).setIsDead(); // The RFLAGS implicit def is dead.
+
     --MBBI;
   }
 

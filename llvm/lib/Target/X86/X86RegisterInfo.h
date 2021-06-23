@@ -48,6 +48,10 @@ private:
   /// variable size stack objects.
   unsigned BasePtr;
 
+  /// SplitStackPtr - X86 physical register used as a stack pointer for the
+  /// unprotected stack when the SVA split stack option is enabled.
+  unsigned SplitStackPtr;
+
 public:
   explicit X86RegisterInfo(const Triple &TT);
 
@@ -138,6 +142,7 @@ public:
   unsigned getPtrSizedStackRegister(const MachineFunction &MF) const;
   Register getStackRegister() const { return StackPtr; }
   Register getBaseRegister() const { return BasePtr; }
+  Register getSplitStackRegister() const { return SplitStackPtr; }
   /// Returns physical register used as frame pointer.
   /// This will always returns the frame pointer register, contrary to
   /// getFrameRegister() which returns the "base pointer" in situations
