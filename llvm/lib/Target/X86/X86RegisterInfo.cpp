@@ -784,6 +784,108 @@ X86RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     return;
   }
 
+  /*
+   * SVA debug: Switch this "#if 1" to "#if 0" to "soft-disable" the split
+   * stack. This will keep all stack objects on the protected (RSP) stack, as
+   * would be the case in a non-split-stack config, but still allows you to
+   * compile with split stack enabled so that RBX is reserved and function
+   * prologues/epilogues will correctly maintain the unprotected (RBX) stack.
+   *
+   * This can be useful for debugging, e.g. when the target program (Xen in
+   * our case) isn't yet aware/supportive of the split stack configuration.
+   * Note, however, that in an operational configuration where RSP actually
+   * points to an SVA-owned stack protected by SFI, this will surely cause
+   * the target program to crash when it tries to use perform RSP-relative
+   * accesses using SFI-gated loads and stores. If you're using this during
+   * development, you'll need to either have the "protected" stack
+   * temporarily live in unprotected memory, or compile without SFI enabled.
+   */
+#if 1
+  // SVA: If split stack is enabled, use RBX instead of RSP as the stack
+  // pointer for objects that go on the unprotected stack.
+  //
+  // When compiling for split stack mode, RBX is a reserved register, and we
+  // decrement/increment it in concert with RSP in function prologues and
+  // epilogues. (See X86FrameLowering::emitPrologue() and emitEpilogue().) To
+  // keep things simple (at the expense of doubling the physical memory usage
+  // of the stack, which is not a problem for Xen because its stack is
+  // limited to a minuscule 8 kB anyway...i.e. now it's 16 instead of 8), we
+  // make the stack frame the same size on both stacks. This means that every
+  // stack object in the main frame (i.e. *not* including things like the
+  // return address, saved RBP, or spill slots, as space for those is
+  // allocated by way of PUSH/POP-type operations instead of
+  // decrement/increment) now has an assigned space corresponding to it on
+  // *each* stack.
+  //
+  // Choosing which stack an object lives on is, therefore, as simple as
+  // switching which register its accesses are based upon. (Note that we
+  // don't have a frame pointer on the unprotected stack, so objects there
+  // will always be accessed using positive offsets from RBX. We do not
+  // permit variable-sized allocas when compiling with split stack enabled,
+  // so these will always match the offsets that would be used for an
+  // RSP-relative access to the same slot on the protected stack.)
+  //
+  // Objects should go on the *protected* stack if their compromise would
+  // undermine fundamental assumptions upon which SVA's security enforcement
+  // rests. This includes:
+  //
+  //  * Return addresses, in order to ensure backwards control flow integrity
+  //    (in addition to the forward CFI provided by SVA's label checks).
+  //
+  //  * Register spill slots, because SVA's SFI and CFI checks are
+  //    implemented at the LLVM IR level, and thus the compiler is free to
+  //    spill intermediate values from those checks to the stack if register
+  //    pressure necessitates doing so.
+  //
+  //  * Callee-saved registers, because like spill slots, these could contain
+  //    sensitive intermediate values from security checks.
+  //
+  //  * Stack-passed function arguments. In principle this is not necessarily
+  //    a security concern, because (for now at least) no SVA intrinsics take
+  //    enough arguments to require any to be passed on the stack. However,
+  //    it is convenient to use the protected stack for argument passing,
+  //    because keeping them on the RSP stack avoids changing the calling
+  //    convention. It is also safe to do so, since function arguments (at
+  //    least at this level) are simple scalar values that are never accessed
+  //    using dynamic offsets and are thus not subject to attacker-controlled
+  //    overflow.
+  //
+  // The protected stack lives in an SVA-controlled region of the virtual
+  // address space from which any SFI-gated reads or writes are excluded.
+  // Since stack accesses not using dynamic pointers or offsets (besides the
+  // stack pointer itself, which is not directly accessible to C code except
+  // using intrinsics or assembly - which SVA prohibits, at least in the
+  // theoretical design) are not visible as loads/stores at the IR level,
+  // they do not require, and are not subject to SFI checks. Since the
+  // objects we are putting on the protected stack are never accessed using
+  // dynamic pointers, correct accesses to them will never be blocked by the
+  // SFI checks. Stack objects originating from allocas, whose pointers *are*
+  // accessible to C code and which can be accessed dynamically, live on the
+  // unprotected stack, which resides in ordinary non-SFI-excluded memory.
+  if (MF.getTarget().Options.SplitStack) {
+    if (
+        // Register spill slots stay on the protected (RSP) stack.
+        !MF.getFrameInfo().isSpillSlotObjectIndex(FrameIndex) &&
+        // Fixed objects (i.e. objects with negative frame indices), such as
+        // stack-passed function arguments, stay on the protected (RSP)
+        // stack.
+        !MF.getFrameInfo().isFixedObjectIndex(FrameIndex)
+        // We do not need to explicitly check for return-address and
+        // callee-saved register slots, because they are accessed implicitly
+        // through instructions which do not take explicit register arguments
+        // for which a frame index would need to be lowered (e.g. PUSH/POP,
+        // CALL/RETURN). If such a slot *were* to be accessed using an
+        // explicit instruction such as a MOV - which is supposed to be
+        // prohibited under SVA - we would want to lower it to an RBX-based
+        // reference so that it safely (although meaninglessly) accesses the
+        // unprotected stack rather than accessing the protected stack in
+        // violation of policy.
+       ) {
+      BasePtr = SplitStackPtr;
+    }
+  }
+#endif
+
   // For LEA64_32r when BasePtr is 32-bits (X32) we can use full-size 64-bit
   // register as source operand, semantic is the same and destination is
   // 32-bits. It saves one byte per lea in code since 0x67 prefix is avoided.
@@ -796,7 +898,11 @@ X86RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   // FrameIndex with base register.  Add an offset to the offset.
   MI.getOperand(FIOperandNum).ChangeToRegister(MachineBasePtr, false);
 
-  if (BasePtr == StackPtr)
+  // SVA: References to objects on the unprotected (RBX) stack use the same
+  // (nonnegative) offsets as RSP-relative references on the main (protected)
+  // stack. Note that there is no frame pointer for the unprotected stack, so
+  // references are always stack-pointer-relative.
+  if (BasePtr == StackPtr || /* SVA */ BasePtr == SplitStackPtr)
     FIOffset += SPAdj;
 
   // The frame index format for stackmaps and patchpoints is different from the
