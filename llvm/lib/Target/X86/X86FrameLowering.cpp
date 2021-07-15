@@ -1224,10 +1224,10 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
   }
 
   // SVA: Determine the amount by which we need to decrement the unprotected
-  // (RBX) stack pointer.
+  // (R15) stack pointer.
   //
   // For now, we will keep this simple by decrementing both stack pointers
-  // (protected on RSP, unprotected on RBX) by the same amount; namely, by
+  // (protected on RSP, unprotected on R15) by the same amount; namely, by
   // the amount which we would normally decrement the single stack pointer in
   // non-split mode.
   //
@@ -1355,8 +1355,8 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
     emitSPUpdate(MBB, MBBI, DL, -(int64_t)NumBytes, /*InEpilogue=*/false);
   }
 
-  // SVA: Decrement the unprotected (RBX) stack pointer as well.
-  //    RBX -= UnprStackDecSize
+  // SVA: Decrement the unprotected (R15) stack pointer as well.
+  //    R15 -= UnprStackDecSize
   if (UnprStackDecSize && MF.getTarget().Options.SplitStack) {
     // Things we don't want to have to deal with...
     // (They might not actually be a problem to support if we wanted to, but

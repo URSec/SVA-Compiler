@@ -65,13 +65,10 @@ X86RegisterInfo::X86RegisterInfo(const Triple &TT)
     FramePtr = Use64BitReg ? X86::RBP : X86::EBP;
     BasePtr = Use64BitReg ? X86::RBX : X86::EBX;
 
-    // SVA: In the split-stack config, we use RBX as the stack pointer for
+    // SVA: In the split-stack config, we use R15 as the stack pointer for
     // the unprotected stack (RSP continues to be used for the protected call
     // stack).
-    //
-    // Note that this is incompatible with using RBX as a BasePtr; we prevent
-    // that combination with a check in X86RegisterInfo::getReservedRegs().
-    SplitStackPtr = X86::RBX;
+    SplitStackPtr = X86::R15;
   } else {
     SlotSize = 4;
     StackPtr = X86::ESP;
@@ -555,19 +552,11 @@ BitVector X86RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   }
 
   // SVA: If split stack is enabled, ensure the stack pointer for the
-  // unprotected stack (RBX) is reserved.
-  //
-  // This use of RBX is incompatible with its use as a base pointer, so we
-  // will throw an error if a base pointer is also to be used.
+  // unprotected stack (R15) is reserved.
   if (MF.getTarget().Options.SplitStack) {
     unsigned SplitStackReg = getSplitStackRegister();
     for (const MCPhysReg &SubReg : subregs_inclusive(SplitStackReg))
       Reserved.set(SubReg);
-
-    if (SplitStackPtr == getBaseRegister() && hasBasePointer(MF))
-      report_fatal_error(
-          "SplitStack is not supported for functions which require a BasePtr "
-          "(since they both require RBX to be free for different purposes).");
   }
 
   // Set the base-pointer register and its aliases as reserved if needed.
@@ -763,8 +752,8 @@ X86RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
    * SVA debug: Switch this "#if 1" to "#if 0" to "soft-disable" the split
    * stack. This will keep all stack objects on the protected (RSP) stack, as
    * would be the case in a non-split-stack config, but still allows you to
-   * compile with split stack enabled so that RBX is reserved and function
-   * prologues/epilogues will correctly maintain the unprotected (RBX) stack.
+   * compile with split stack enabled so that R15 is reserved and function
+   * prologues/epilogues will correctly maintain the unprotected (R15) stack.
    *
    * This can be useful for debugging, e.g. when the target program (Xen in
    * our case) isn't yet aware/supportive of the split stack configuration.
@@ -776,10 +765,10 @@ X86RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
    * temporarily live in unprotected memory, or compile without SFI enabled.
    */
 #if 1
-  // SVA: If split stack is enabled, use RBX instead of RSP as the stack
+  // SVA: If split stack is enabled, use R15 instead of RSP as the stack
   // pointer for objects that go on the unprotected stack.
   //
-  // When compiling for split stack mode, RBX is a reserved register, and we
+  // When compiling for split stack mode, R15 is a reserved register, and we
   // decrement/increment it in concert with RSP in function prologues and
   // epilogues. (See X86FrameLowering::emitPrologue() and emitEpilogue().) To
   // keep things simple (at the expense of doubling the physical memory usage
@@ -795,7 +784,7 @@ X86RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   // Choosing which stack an object lives on is, therefore, as simple as
   // switching which register its accesses are based upon. (Note that we
   // don't have a frame pointer on the unprotected stack, so objects there
-  // will always be accessed using positive offsets from RBX. We do not
+  // will always be accessed using positive offsets from R15. We do not
   // permit variable-sized allocas when compiling with split stack enabled,
   // so these will always match the offsets that would be used for an
   // RSP-relative access to the same slot on the protected stack.)
@@ -851,7 +840,7 @@ X86RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
         // for which a frame index would need to be lowered (e.g. PUSH/POP,
         // CALL/RETURN). If such a slot *were* to be accessed using an
         // explicit instruction such as a MOV - which is supposed to be
-        // prohibited under SVA - we would want to lower it to an RBX-based
+        // prohibited under SVA - we would want to lower it to an R15-based
         // reference so that it safely (although meaninglessly) accesses the
         // unprotected stack rather than accessing the protected stack in
         // violation of policy.
