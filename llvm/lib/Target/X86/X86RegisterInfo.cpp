@@ -758,32 +758,7 @@ X86RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   const X86FrameLowering *TFI = getFrameLowering(MF);
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
 
-  // Determine base register and offset.
-  int FIOffset;
-  unsigned BasePtr;
-  if (MI.isReturn()) {
-    assert((!needsStackRealignment(MF) ||
-           MF.getFrameInfo().isFixedObjectIndex(FrameIndex)) &&
-           "Return instruction can only reference SP relative frame objects");
-    FIOffset = TFI->getFrameIndexReferenceSP(MF, FrameIndex, BasePtr, 0);
-  } else if (TFI->Is64Bit && (MBB.isEHFuncletEntry() || IsEHFuncletEpilogue)) {
-    FIOffset = TFI->getWin64EHFrameIndexRef(MF, FrameIndex, BasePtr);
-  } else {
-    FIOffset = TFI->getFrameIndexReference(MF, FrameIndex, BasePtr);
-  }
-
-  // LOCAL_ESCAPE uses a single offset, with no register. It only works in the
-  // simple FP case, and doesn't work with stack realignment. On 32-bit, the
-  // offset is from the traditional base pointer location.  On 64-bit, the
-  // offset is from the SP at the end of the prologue, not the FP location. This
-  // matches the behavior of llvm.frameaddress.
-  unsigned Opc = MI.getOpcode();
-  if (Opc == TargetOpcode::LOCAL_ESCAPE) {
-    MachineOperand &FI = MI.getOperand(FIOperandNum);
-    FI.ChangeToImmediate(FIOffset);
-    return;
-  }
-
+  bool UseUnprotectedStack = false;
   /*
    * SVA debug: Switch this "#if 1" to "#if 0" to "soft-disable" the split
    * stack. This will keep all stack objects on the protected (RSP) stack, as
@@ -881,10 +856,85 @@ X86RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
         // unprotected stack rather than accessing the protected stack in
         // violation of policy.
        ) {
-      BasePtr = SplitStackPtr;
+      UseUnprotectedStack = true;
     }
   }
 #endif
+
+  // Determine base register and offset.
+  int FIOffset;
+  unsigned BasePtr;
+  if (MI.isReturn()) {
+    assert((!needsStackRealignment(MF) ||
+           MF.getFrameInfo().isFixedObjectIndex(FrameIndex)) &&
+           "Return instruction can only reference SP relative frame objects");
+    FIOffset = TFI->getFrameIndexReferenceSP(MF, FrameIndex, BasePtr, 0);
+  } else if (TFI->Is64Bit && (MBB.isEHFuncletEntry() || IsEHFuncletEpilogue)) {
+    FIOffset = TFI->getWin64EHFrameIndexRef(MF, FrameIndex, BasePtr);
+  } else if (UseUnprotectedStack) { // SVA
+    // Always get a SP-relative reference for objects that will go on the
+    // unprotected stack, because we don't use a frame pointer there. We
+    // will replace the provided BasePtr=RSP with the unprotected stack
+    // pointer (RBX), but we want the offset to be the same as if it were
+    // based on RSP.
+    //
+    // We should be able to get away with this even when stack realignment is
+    // needed because we're leaving fixed objects (function arguments and
+    // CSRs) on the protected stack, which still has a frame pointer.
+    // Non-fixed stack objects can still be accessed relative to SP in
+    // functions with stack alignment, since the realignment occurs before
+    // space for them is allocated; in fact, they *must* be accessed using
+    // SP, because the dynamic alignment made their FP-relative offset
+    // unknown.
+    //
+    // This is precisely what getFrameIndexReference() does in such cases.
+    // The only reason we need to force an SP-relative reference here, rather
+    // than allowing getFrameIndexReference() to make the decision for us as
+    // in the non-SVA case, is for the sake of functions which *don't* have
+    // stack realignment - in which all objects can be referenced equally
+    // well using SP or FP, yet getFrameIndexReference() will prefer FP if it
+    // exists.
+    //
+    // FIXME: we are not currently doing realignment on the unprotected stack
+    // at all, even though we really should (because Xen *does* put some
+    // objects on the stack with alignment requirements, notably XSAVE
+    // areas). It should be straightforward enough to fix this if we need to
+    // (we'll need to have the alignment instructions reference the
+    // unprotected pointer instead of RSP; repurpose the frame pointer
+    // RBP for the unprotected stack; and force LLVM to lower all
+    // protected-stack references using SP-relative references, which should
+    // be doable since there will no longer be realignment on the protected
+    // stack). However, since I don't *think* Xen is actually using those
+    // XSAVE areas directly with hardware instructions any more (only passing
+    // them off to SVA, which copies them into its own structures which *are*
+    // correctly aligned since it doesn't use a split stack), we might get
+    // away with it as-is. (Fingers crossed that Xen doesn't need alignment
+    // for anything *other* than XSAVE areas, at least not for features we
+    // care about in our prototype...)
+    FIOffset = TFI->getFrameIndexReferenceSP(MF, FrameIndex, BasePtr, MF.getFrameInfo().getStackSize());
+    BasePtr = SplitStackPtr;
+
+    // I'm not entirely sure what SPAdj is supposed to be used for, since it
+    // seems to be 0 in practice. I'm guessing it doesn't apply for "simple"
+    // static stack frames of the sort we're using for our unprotected stack
+    // (no dynamic allocas), but since I'm not sure we'll use an assert to
+    // warn us if it ever shows up.
+    assert(SPAdj == 0 && "SplitStack: not sure what to do with non-zero SPAdj");
+  } else {
+    FIOffset = TFI->getFrameIndexReference(MF, FrameIndex, BasePtr);
+  }
+
+  // LOCAL_ESCAPE uses a single offset, with no register. It only works in the
+  // simple FP case, and doesn't work with stack realignment. On 32-bit, the
+  // offset is from the traditional base pointer location.  On 64-bit, the
+  // offset is from the SP at the end of the prologue, not the FP location. This
+  // matches the behavior of llvm.frameaddress.
+  unsigned Opc = MI.getOpcode();
+  if (Opc == TargetOpcode::LOCAL_ESCAPE) {
+    MachineOperand &FI = MI.getOperand(FIOperandNum);
+    FI.ChangeToImmediate(FIOffset);
+    return;
+  }
 
   // For LEA64_32r when BasePtr is 32-bits (X32) we can use full-size 64-bit
   // register as source operand, semantic is the same and destination is
@@ -898,11 +948,7 @@ X86RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   // FrameIndex with base register.  Add an offset to the offset.
   MI.getOperand(FIOperandNum).ChangeToRegister(MachineBasePtr, false);
 
-  // SVA: References to objects on the unprotected (RBX) stack use the same
-  // (nonnegative) offsets as RSP-relative references on the main (protected)
-  // stack. Note that there is no frame pointer for the unprotected stack, so
-  // references are always stack-pointer-relative.
-  if (BasePtr == StackPtr || /* SVA */ BasePtr == SplitStackPtr)
+  if (BasePtr == StackPtr)
     FIOffset += SPAdj;
 
   // The frame index format for stackmaps and patchpoints is different from the
