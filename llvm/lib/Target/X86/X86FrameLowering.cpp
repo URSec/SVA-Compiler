@@ -1253,6 +1253,25 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
   // arguments, which we pass on the protected stack).
   uint64_t UnprStackDecSize = NumBytes;
 
+  // SVA: Stash a copy of UnprStackDecSize in the MachineFrameInfo object so
+  // that emitEpilogue() knows exactly how much it needs to increment the
+  // unprotected stack pointer to undo what we did here in the prologue.
+  //
+  // This is a workaround for an odd issue we've encountered (but don't yet
+  // completely understand) where sometimes LLVM would come up with a
+  // different number for this in the epilogue vs. the prologue, despite the
+  // computations seemingly being exactly the same. By process of
+  // elimination, it would seem that either StackSize or CSSize is getting
+  // changed somehow between when emitPrologue() and emitEpilogue() run. We
+  // haven't yet found where that's happening (it isn't in what would seem to
+  // be the obvious places), but as we've only seen this happen when
+  // compiling functions with a frame pointer (not for *all* functions with a
+  // frame pointer, but for some), it may be the case that LLVM isn't even
+  // trying to maintain this information correctly between prologue and
+  // epilogue insertion because it knows it's just going to restore RSP from
+  // the frame pointer in the epilogue instead of doing an ADD.
+  MFI.setUnprStackFrameSize(UnprStackDecSize);
+
   // If there is an SUB32ri of ESP immediately before this instruction, merge
   // the two. This can be the case when tail call elimination is enabled and
   // the callee has more arguments then the caller.
@@ -1354,7 +1373,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
     // and RSP decrement) shouldn't be using RFLAGS as an input, so as long
     // as the block itself doesn't have RFLAGS as a live-in we should be safe
     // to use a SUB instruction for this. (Avoids complicated special-case
-    // code similar to that in BuildstackAdjustment() to fall back to LEA in
+    // code similar to that in BuildStackAdjustment() to fall back to LEA in
     // such cases.)
     assert(!MBB.isLiveIn(X86::EFLAGS) &&
         "Cannot use SUB to decrement unprotected (RBX) stack pointer because "
@@ -1750,7 +1769,25 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
   // As in emitPrologue(), we currently use the same value as for the
   // protected (RSP) stack, not including the result of the call to
   // mergeSPUpdates() below.
-  uint64_t UnprStackIncSize = NumBytes;
+  //
+  // NOTE: In principle, we should be able to get this value from the current
+  // value of NumBytes, just as we do in emitPrologue(). However, when we did
+  // that we found that in certain cases where a frame pointer is present,
+  // the values wouldn't match between emitPrologue() and emitEpilogue().
+  // It's a bit mystifying because emitPrologue() and emitEpilogue() seem to
+  // be computing NumBytes exactly the same way, and there doesn't *seem* to
+  // be anything happening in between them that could change the underlying
+  // values they're using for the computation (although I might've missed
+  // something; I'm assuming I must have, because otherwise this would seem
+  // impossible). LLVM doesn't seem to mind the discrepancy, because when
+  // there's a frame pointer, it's just going to restore RSP from the frame
+  // pointer instead of doing an ADD. But it matters for us, because we don't
+  // (yet) support a frame pointer on the unprotected stack and always use an
+  // ADD in the epilogue to undo the SUB in the prologue. So as a workaround,
+  // we're stashing the value used for the SUB in emitPrologue() in
+  // MachineFrameInfo so we can recall it here.
+  uint64_t UnprStackIncSize = MFI.getUnprStackFrameSize();
+  //uint64_t UnprStackIncSize = NumBytes; // disabled in favor of workaround above
 
   // If there is an ADD32ri or SUB32ri of ESP immediately before this
   // instruction, merge the two instructions.

@@ -242,6 +242,12 @@ private:
   /// to be allocated on entry to the function.
   uint64_t StackSize = 0;
 
+  /// SVA: Saves the frame size for the unprotected stack (used when split
+  /// stack is enabled) as determined by emitPrologue(). Used by
+  /// emitEpilogue() to ensure the respective subtraction and addition of the
+  /// unprotected stack pointer always match.
+  uint64_t UnprStackFrameSize = 0;
+
   /// The amount that a frame offset needs to be adjusted to
   /// have the actual offset from the stack/frame pointer.  The exact usage of
   /// this is target-dependent, but it is typically used to adjust between
@@ -551,6 +557,10 @@ public:
 
   /// Set the size of the stack.
   void setStackSize(uint64_t Size) { StackSize = Size; }
+
+  /// SVA: Accessor and getter for UnprStackFrameSize (see above).
+  uint64_t getUnprStackFrameSize() const { return UnprStackFrameSize; }
+  void setUnprStackFrameSize(uint64_t size) { UnprStackFrameSize = size; }
 
   /// Estimate and return the size of the stack frame.
   uint64_t estimateStackSize(const MachineFunction &MF) const;
