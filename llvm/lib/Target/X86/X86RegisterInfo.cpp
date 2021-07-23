@@ -553,7 +553,10 @@ BitVector X86RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
 
   // SVA: If split stack is enabled, ensure the stack pointer for the
   // unprotected stack (R15) is reserved.
-  if (MF.getTarget().Options.SplitStack) {
+  //
+  // Also reserve the unprotected stack register when compiling SVA itself so
+  // that it gets preserved for callbacks.
+  if (MF.getTarget().Options.SplitStack || MF.getTarget().Options.SVA) {
     unsigned SplitStackReg = getSplitStackRegister();
     for (const MCPhysReg &SubReg : subregs_inclusive(SplitStackReg))
       Reserved.set(SubReg);
