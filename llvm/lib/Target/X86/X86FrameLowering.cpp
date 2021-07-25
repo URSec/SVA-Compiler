@@ -1905,15 +1905,84 @@ int X86FrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
   const MachineFrameInfo &MFI = MF.getFrameInfo();
 
   bool IsFixed = MFI.isFixedObjectIndex(FI);
-  // We can't calculate offset from frame pointer if the stack is realigned,
-  // so enforce usage of stack/base pointer.  The base pointer is used when we
-  // have dynamic allocas in addition to dynamic realignment.
-  if (TRI->hasBasePointer(MF))
+  bool SplitStack = MF.getTarget().Options.SplitStack;
+
+  // SVA: If split stack is enabled, use R15 instead of RSP as the stack
+  // pointer for objects that go on the unprotected stack.
+  //
+  // When compiling for split stack mode, R15 is a reserved register, and we
+  // decrement/increment it in concert with RSP in function prologues and
+  // epilogues. (See X86FrameLowering::emitPrologue() and emitEpilogue().) To
+  // keep things simple (at the expense of doubling the physical memory usage
+  // of the stack, which is not a problem for Xen because its stack is
+  // limited to a minuscule 8 kB anyway...i.e. now it's 16 instead of 8), we
+  // make the stack frame the same size on both stacks. This means that every
+  // stack object in the main frame (i.e. *not* including things like the
+  // return address, saved RBP, or spill slots, as space for those is
+  // allocated by way of PUSH/POP-type operations instead of
+  // decrement/increment) now has an assigned space corresponding to it on
+  // *each* stack.
+  //
+  // Choosing which stack an object lives on is, therefore, as simple as
+  // switching which register its accesses are based upon. (Note that we
+  // don't have a frame pointer on the unprotected stack, so objects there
+  // will always be accessed using positive offsets from R15. We do not
+  // permit variable-sized allocas when compiling with split stack enabled,
+  // so these will always match the offsets that would be used for an
+  // RSP-relative access to the same slot on the protected stack.)
+  //
+  // Objects should go on the *protected* stack if their compromise would
+  // undermine fundamental assumptions upon which SVA's security enforcement
+  // rests. This includes:
+  //
+  //  * Return addresses, in order to ensure backwards control flow integrity
+  //    (in addition to the forward CFI provided by SVA's label checks).
+  //
+  //  * Register spill slots, because SVA's SFI and CFI checks are
+  //    implemented at the LLVM IR level, and thus the compiler is free to
+  //    spill intermediate values from those checks to the stack if register
+  //    pressure necessitates doing so.
+  //
+  //  * Callee-saved registers, because like spill slots, these could contain
+  //    sensitive intermediate values from security checks.
+  //
+  //  * Stack-passed function arguments. In principle this is not necessarily
+  //    a security concern, because (for now at least) no SVA intrinsics take
+  //    enough arguments to require any to be passed on the stack. However,
+  //    it is convenient to use the protected stack for argument passing,
+  //    because keeping them on the RSP stack avoids changing the calling
+  //    convention. It is also safe to do so, since function arguments (at
+  //    least at this level) are simple scalar values that are never accessed
+  //    using dynamic offsets and are thus not subject to attacker-controlled
+  //    overflow.
+  //
+  // The protected stack lives in an SVA-controlled region of the virtual
+  // address space from which any SFI-gated reads or writes are excluded.
+  // Since stack accesses not using dynamic pointers or offsets (besides the
+  // stack pointer itself, which is not directly accessible to C code except
+  // using intrinsics or assembly - which SVA prohibits, at least in the
+  // theoretical design) are not visible as loads/stores at the IR level,
+  // they do not require, and are not subject to SFI checks. Since the
+  // objects we are putting on the protected stack are never accessed using
+  // dynamic pointers, correct accesses to them will never be blocked by the
+  // SFI checks. Stack objects originating from allocas, whose pointers *are*
+  // accessible to C code and which can be accessed dynamically, live on the
+  // unprotected stack, which resides in ordinary non-SFI-excluded memory.
+  bool UseUnprotectedStack =
+    SplitStack && !(IsFixed || MFI.isSpillSlotObjectIndex(FI));
+
+  if (UseUnprotectedStack) {
+    FrameReg = TRI->getSplitStackRegister();
+  } else if (TRI->hasBasePointer(MF)) {
+    // We can't calculate offset from frame pointer if the stack is realigned,
+    // so enforce usage of stack/base pointer.  The base pointer is used when we
+    // have dynamic allocas in addition to dynamic realignment.
     FrameReg = IsFixed ? TRI->getFramePtr() : TRI->getBaseRegister();
-  else if (TRI->needsStackRealignment(MF))
+  } else if (TRI->needsStackRealignment(MF)) {
     FrameReg = IsFixed ? TRI->getFramePtr() : TRI->getStackRegister();
-  else
+  } else {
     FrameReg = TRI->getFrameRegister(MF);
+  }
 
   // Offset will hold the offset from the stack pointer at function entry to the
   // object.
@@ -1959,8 +2028,40 @@ int X86FrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
            "FPDelta isn't aligned per the Win64 ABI!");
   }
 
+  if (UseUnprotectedStack) {
+    assert(!TRI->hasBasePointer(MF) && "Split stack doesn't support VLAs");
+    assert(!MFI.hasVarSizedObjects() && "Split stack doesn't support VLAs");
 
-  if (TRI->hasBasePointer(MF)) {
+    // Always use the same offset as from RSP for objects that will go on the
+    // unprotected stack, because we don't use a frame pointer there.
+    //
+    // We should be able to get away with this even when stack realignment is
+    // needed because we're leaving fixed objects (function arguments and
+    // CSRs) on the protected stack, which still has a frame pointer.
+    // Non-fixed stack objects can still be accessed relative to SP in
+    // functions with stack alignment, since the realignment occurs before
+    // space for them is allocated; in fact, they *must* be accessed using
+    // SP, because the dynamic alignment made their FP-relative offset
+    // unknown.
+    //
+    // FIXME: we are not currently doing realignment on the unprotected stack
+    // at all, even though we really should (because Xen *does* put some
+    // objects on the stack with alignment requirements, notably XSAVE
+    // areas). It should be straightforward enough to fix this if we need to
+    // (we'll need to have the alignment instructions reference the
+    // unprotected pointer instead of RSP; repurpose the frame pointer
+    // RBP for the unprotected stack; and force LLVM to lower all
+    // protected-stack references using SP-relative references, which should
+    // be doable since there will no longer be realignment on the protected
+    // stack). However, since I don't *think* Xen is actually using those
+    // XSAVE areas directly with hardware instructions any more (only passing
+    // them off to SVA, which copies them into its own structures which *are*
+    // correctly aligned since it doesn't use a split stack), we might get
+    // away with it as-is. (Fingers crossed that Xen doesn't need alignment
+    // for anything *other* than XSAVE areas, at least not for features we
+    // care about in our prototype...)
+    return Offset + StackSize;
+  } else if (TRI->hasBasePointer(MF)) {
     assert(HasFP && "VLAs and dynamic stack realign, but no FP?!");
     if (FI < 0) {
       // Skip the saved EBP.
