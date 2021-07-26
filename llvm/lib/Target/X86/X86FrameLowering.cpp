@@ -340,7 +340,8 @@ void X86FrameLowering::emitSPUpdate(MachineBasicBlock &MBB,
       }
     }
 
-    BuildStackAdjustment(MBB, MBBI, DL, isSub ? -ThisVal : ThisVal, InEpilogue)
+    BuildStackAdjustment(MBB, MBBI, DL, StackPtr,
+                         isSub ? -ThisVal : ThisVal, InEpilogue)
         .setMIFlag(Flag);
 
     Offset -= ThisVal;
@@ -349,7 +350,8 @@ void X86FrameLowering::emitSPUpdate(MachineBasicBlock &MBB,
 
 MachineInstrBuilder X86FrameLowering::BuildStackAdjustment(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
-    const DebugLoc &DL, int64_t Offset, bool InEpilogue) const {
+    const DebugLoc &DL, Register StackReg, int64_t Offset,
+    bool InEpilogue) const {
   assert(Offset != 0 && "zero offset stack adjustment requested");
 
   // On Atom, using LEA to adjust SP is preferred, but using it in the epilogue
@@ -380,15 +382,15 @@ MachineInstrBuilder X86FrameLowering::BuildStackAdjustment(
   if (UseLEA) {
     MI = addRegOffset(BuildMI(MBB, MBBI, DL,
                               TII.get(getLEArOpcode(Uses64BitFramePtr)),
-                              StackPtr),
-                      StackPtr, false, Offset);
+                              StackReg),
+                      StackReg, false, Offset);
   } else {
     bool IsSub = Offset < 0;
     uint64_t AbsOffset = IsSub ? -Offset : Offset;
     unsigned Opc = IsSub ? getSUBriOpcode(Uses64BitFramePtr, AbsOffset)
                          : getADDriOpcode(Uses64BitFramePtr, AbsOffset);
-    MI = BuildMI(MBB, MBBI, DL, TII.get(Opc), StackPtr)
-             .addReg(StackPtr)
+    MI = BuildMI(MBB, MBBI, DL, TII.get(Opc), StackReg)
+             .addReg(StackReg)
              .addImm(AbsOffset);
     MI->getOperand(3).setIsDead(); // The EFLAGS implicit def is dead.
   }
@@ -1054,7 +1056,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
   // applies to tail call optimized functions where the callee argument stack
   // size is bigger than the callers.
   if (TailCallReturnAddrDelta < 0) {
-    BuildStackAdjustment(MBB, MBBI, DL, TailCallReturnAddrDelta,
+    BuildStackAdjustment(MBB, MBBI, DL, StackPtr, TailCallReturnAddrDelta,
                          /*InEpilogue=*/false)
         .setMIFlag(MachineInstr::FrameSetup);
   }
@@ -3115,7 +3117,7 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
       if (StackAdjustment) {
         if (!(F.hasMinSize() &&
               adjustStackWithPops(MBB, InsertPos, DL, StackAdjustment)))
-          BuildStackAdjustment(MBB, InsertPos, DL, StackAdjustment,
+          BuildStackAdjustment(MBB, InsertPos, DL, StackPtr, StackAdjustment,
                                /*InEpilogue=*/false);
       }
     }
@@ -3152,7 +3154,7 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
     MachineBasicBlock::iterator B = MBB.begin();
     while (CI != B && !std::prev(CI)->isCall())
       --CI;
-    BuildStackAdjustment(MBB, CI, DL, -InternalAmt, /*InEpilogue=*/false);
+    BuildStackAdjustment(MBB, CI, DL, StackPtr, -InternalAmt, /*InEpilogue=*/false);
   }
 
   return I;

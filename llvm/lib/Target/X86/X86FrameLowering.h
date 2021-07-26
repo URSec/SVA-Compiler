@@ -208,7 +208,8 @@ private:
   /// Adjusts the stack pointer using LEA, SUB, or ADD.
   MachineInstrBuilder BuildStackAdjustment(MachineBasicBlock &MBB,
                                            MachineBasicBlock::iterator MBBI,
-                                           const DebugLoc &DL, int64_t Offset,
+                                           const DebugLoc &DL,
+                                           Register StackReg, int64_t Offset,
                                            bool InEpilogue) const;
 
   unsigned getPSPSlotOffsetFromSP(const MachineFunction &MF) const;
