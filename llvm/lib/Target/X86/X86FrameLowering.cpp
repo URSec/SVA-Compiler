@@ -1938,13 +1938,19 @@ int X86FrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
   //  * Return addresses, in order to ensure backwards control flow integrity
   //    (in addition to the forward CFI provided by SVA's label checks).
   //
-  //  * Register spill slots, because SVA's SFI and CFI checks are
+  //  * Callee-saved registers, because SVA's SFI and CFI checks are
   //    implemented at the LLVM IR level, and thus the compiler is free to
   //    spill intermediate values from those checks to the stack if register
   //    pressure necessitates doing so.
   //
-  //  * Callee-saved registers, because like spill slots, these could contain
-  //    sensitive intermediate values from security checks.
+  //    NB: We do not place register spill slots on the unprotected stack
+  //    because it is possible for them to require enough space to bypass the
+  //    guard page. Additionally, it is not certain that spilling those values
+  //    to the protected stack is sufficient to protect them as intended: we may
+  //    need to also prevent them from being live-in to certain basic blocks.
+  //    This is mostly a theoretical problem since these values usually either
+  //    don't live long enough to get spilled or are constants and get
+  //    rematerialized rather than loaded from memory.
   //
   //  * Stack-passed function arguments. In principle this is not necessarily
   //    a security concern, because (for now at least) no SVA intrinsics take
@@ -1968,8 +1974,7 @@ int X86FrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
   // SFI checks. Stack objects originating from allocas, whose pointers *are*
   // accessible to C code and which can be accessed dynamically, live on the
   // unprotected stack, which resides in ordinary non-SFI-excluded memory.
-  bool UseUnprotectedStack =
-    SplitStack && !(IsFixed || MFI.isSpillSlotObjectIndex(FI));
+  bool UseUnprotectedStack = SplitStack && !IsFixed;
 
   if (UseUnprotectedStack) {
     FrameReg = TRI->getSplitStackRegister();
