@@ -4026,9 +4026,14 @@ X86TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
       }
     } else if (!IsSibcall && (!isTailCall || isByVal)) {
       assert(VA.isMemLoc());
-      if (!StackPtr.getNode())
-        StackPtr = DAG.getCopyFromReg(Chain, dl, RegInfo->getStackRegister(),
+      if (!StackPtr.getNode()) {
+        Register StackPtrReg =
+          MF.getTarget().Options.SplitStack
+          ? RegInfo->getSplitStackRegister()
+          : RegInfo->getStackRegister();
+        StackPtr = DAG.getCopyFromReg(Chain, dl, StackPtrReg,
                                       getPointerTy(DAG.getDataLayout()));
+      }
       MemOpChains.push_back(LowerMemOpCallTo(Chain, StackPtr, Arg,
                                              dl, DAG, VA, Flags));
     }
@@ -4140,9 +4145,14 @@ X86TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
       if (Flags.isByVal()) {
         // Copy relative to framepointer.
         SDValue Source = DAG.getIntPtrConstant(VA.getLocMemOffset(), dl);
-        if (!StackPtr.getNode())
-          StackPtr = DAG.getCopyFromReg(Chain, dl, RegInfo->getStackRegister(),
+        if (!StackPtr.getNode()) {
+          Register StackPtrReg =
+            MF.getTarget().Options.SplitStack
+            ? RegInfo->getSplitStackRegister()
+            : RegInfo->getStackRegister();
+          StackPtr = DAG.getCopyFromReg(Chain, dl, StackPtrReg,
                                         getPointerTy(DAG.getDataLayout()));
+        }
         Source = DAG.getNode(ISD::ADD, dl, getPointerTy(DAG.getDataLayout()),
                              StackPtr, Source);
 

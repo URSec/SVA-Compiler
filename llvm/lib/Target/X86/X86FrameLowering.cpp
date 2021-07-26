@@ -1907,6 +1907,18 @@ int X86FrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
   bool IsFixed = MFI.isFixedObjectIndex(FI);
   bool SplitStack = MF.getTarget().Options.SplitStack;
 
+  // Offset will hold the offset from the stack pointer at function entry to the
+  // object.
+  // We need to factor in additional offsets applied during the prologue to the
+  // frame, base, and stack pointer depending on which is used.
+  int Offset = MFI.getObjectOffset(FI) - getOffsetOfLocalArea();
+  const X86MachineFunctionInfo *X86FI = MF.getInfo<X86MachineFunctionInfo>();
+  unsigned CSSize = X86FI->getCalleeSavedFrameSize();
+  uint64_t StackSize = MFI.getStackSize();
+  bool HasFP = hasFP(MF);
+  bool IsWin64Prologue = MF.getTarget().getMCAsmInfo()->usesWindowsCFI();
+  int64_t FPDelta = 0;
+
   // SVA: If split stack is enabled, use R15 instead of RSP as the stack
   // pointer for objects that go on the unprotected stack.
   //
@@ -1952,16 +1964,6 @@ int X86FrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
   //    don't live long enough to get spilled or are constants and get
   //    rematerialized rather than loaded from memory.
   //
-  //  * Stack-passed function arguments. In principle this is not necessarily
-  //    a security concern, because (for now at least) no SVA intrinsics take
-  //    enough arguments to require any to be passed on the stack. However,
-  //    it is convenient to use the protected stack for argument passing,
-  //    because keeping them on the RSP stack avoids changing the calling
-  //    convention. It is also safe to do so, since function arguments (at
-  //    least at this level) are simple scalar values that are never accessed
-  //    using dynamic offsets and are thus not subject to attacker-controlled
-  //    overflow.
-  //
   // The protected stack lives in an SVA-controlled region of the virtual
   // address space from which any SFI-gated reads or writes are excluded.
   // Since stack accesses not using dynamic pointers or offsets (besides the
@@ -1974,9 +1976,15 @@ int X86FrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
   // SFI checks. Stack objects originating from allocas, whose pointers *are*
   // accessible to C code and which can be accessed dynamically, live on the
   // unprotected stack, which resides in ordinary non-SFI-excluded memory.
-  bool UseUnprotectedStack = SplitStack && !IsFixed;
-
-  if (UseUnprotectedStack) {
+  if (SplitStack) {
+    // Special case the return address, which lives on the protected stack.
+    // Callee-saved registers also live on the protected stack, but we
+    // shouldn't have any references to them.
+    assert(!(IsFixed && MFI.isSpillSlotObjectIndex(FI)));
+    if (IsFixed && FI == X86FI->getRAIndex()) {
+      FrameReg = HasFP ? TRI->getFramePtr() : TRI->getStackRegister();
+      return Offset + (HasFP ? SlotSize : StackSize);
+    }
     FrameReg = TRI->getSplitStackRegister();
   } else if (TRI->hasBasePointer(MF)) {
     // We can't calculate offset from frame pointer if the stack is realigned,
@@ -1989,18 +1997,6 @@ int X86FrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
     FrameReg = TRI->getFrameRegister(MF);
   }
 
-  // Offset will hold the offset from the stack pointer at function entry to the
-  // object.
-  // We need to factor in additional offsets applied during the prologue to the
-  // frame, base, and stack pointer depending on which is used.
-  int Offset = MFI.getObjectOffset(FI) - getOffsetOfLocalArea();
-  const X86MachineFunctionInfo *X86FI = MF.getInfo<X86MachineFunctionInfo>();
-  unsigned CSSize = X86FI->getCalleeSavedFrameSize();
-  uint64_t StackSize = MFI.getStackSize();
-  bool HasFP = hasFP(MF);
-  bool IsWin64Prologue = MF.getTarget().getMCAsmInfo()->usesWindowsCFI();
-  int64_t FPDelta = 0;
-
   // In an x86 interrupt, remove the offset we added to account for the return
   // address from any stack object allocated in the caller's frame. Interrupts
   // do not have a standard return address. Fixed objects in the current frame,
@@ -2008,6 +2004,19 @@ int X86FrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
   if (MF.getFunction().getCallingConv() == CallingConv::X86_INTR &&
       Offset >= 0) {
     Offset += getOffsetOfLocalArea();
+  }
+
+  // The unprotected stack does not contain space for a return address or
+  // callee-saved registers. Adjust the offset to compensate.
+  if (SplitStack && IsFixed) {
+    // No return address on the unprotected stack
+    Offset += getOffsetOfLocalArea();
+    // No callee-saved registers on the unprotected stack
+    Offset -= X86FI->getCalleeSavedFrameSize();
+    // No saved frame pointer on the unprotected stack
+    if (HasFP) {
+      Offset -= SlotSize;
+    }
   }
 
   if (IsWin64Prologue) {
@@ -2033,7 +2042,7 @@ int X86FrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
            "FPDelta isn't aligned per the Win64 ABI!");
   }
 
-  if (UseUnprotectedStack) {
+  if (SplitStack) {
     assert(!TRI->hasBasePointer(MF) && "Split stack doesn't support VLAs");
     assert(!MFI.hasVarSizedObjects() && "Split stack doesn't support VLAs");
 
