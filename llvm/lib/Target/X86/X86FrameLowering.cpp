@@ -1007,6 +1007,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
   Register BasePtr = TRI->getBaseRegister();
   bool HasWinCFI = false;
   bool SplitStack = MF.getTarget().Options.SplitStack;
+  Register FnStackPtr = SplitStack ? TRI->getSplitStackRegister() : Register(StackPtr);
 
   // Debug location must be unknown since the first debug location is used
   // to determine the end of the prologue.
@@ -1142,7 +1143,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
       BuildMI(MBB, MBBI, DL,
               TII.get(Uses64BitFramePtr ? X86::MOV64rr : X86::MOV32rr),
               FramePtr)
-          .addReg(StackPtr)
+          .addReg(FnStackPtr)
           .setMIFlag(MachineInstr::FrameSetup);
 
       if (NeedsDwarfCFI) {
@@ -1356,8 +1357,8 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
       MI->setFlag(MachineInstr::FrameSetup);
       MBB.insert(MBBI, MI);
     }
-  } else if (!SplitStack && NumBytes != 0) {
-    emitSPUpdate(MBB, MBBI, DL, StackPtr, -(int64_t)NumBytes, /*InEpilogue=*/false);
+  } else if (NumBytes != 0) {
+    emitSPUpdate(MBB, MBBI, DL, FnStackPtr, -(int64_t)NumBytes, /*InEpilogue=*/false);
   }
 
   // SVA: Decrement the unprotected (R15) stack pointer as well.
@@ -1374,6 +1375,8 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
     assert(!MFI.hasVarSizedObjects() &&
         "Variable-sized stack objects not supported with SVA split stack.");
 
+    // Disabled now that we can use `emitSPUpdate` for the data stack.
+#if 0
     // Code prior to this point in the epilogue (callee-saved register pushes
     // and RSP decrement) shouldn't be using RFLAGS as an input, so as long
     // as the block itself doesn't have RFLAGS as a live-in we should be safe
@@ -1397,6 +1400,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
       .addReg(SplitStackReg)
       .addImm(UnprStackDecSize);
     MI->getOperand(3).setIsDead(); // The RFLAGS implicit def is dead.
+#endif
   }
 
   if (NeedsWinCFI && NumBytes) {
@@ -1710,6 +1714,7 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
   bool HasFP = hasFP(MF);
   uint64_t NumBytes = 0;
   bool SplitStack = MF.getTarget().Options.SplitStack;
+  Register FnStackPtr = SplitStack ? TRI->getSplitStackRegister() : Register(StackPtr);
 
   bool NeedsDwarfCFI = (!MF.getTarget().getTargetTriple().isOSDarwin() &&
                         !MF.getTarget().getTargetTriple().isOSWindows()) &&
@@ -1807,12 +1812,18 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
   // split stack, where the hardware stack pointer always points to the end of
   // the callee-saved registers.
   if ((TRI->needsStackRealignment(MF) || MFI.hasVarSizedObjects()) &&
-      !IsFunclet && !SplitStack) {
+      !IsFunclet) {
     if (TRI->needsStackRealignment(MF))
       MBBI = FirstCSPop;
     unsigned SEHFrameOffset = calculateSetFPREG(SEHStackAllocAmt);
-    uint64_t LEAAmount =
-        IsWin64Prologue ? SEHStackAllocAmt - SEHFrameOffset : -CSSize;
+    uint64_t LEAAmount;
+    if (SplitStack) {
+      LEAAmount = 0;
+    } else if (IsWin64Prologue) {
+      LEAAmount = SEHStackAllocAmt - SEHFrameOffset;
+    } else {
+      LEAAmount = -CSSize;
+    }
 
     // There are only two legal forms of epilogue:
     // - add SEHAllocationSize, %rsp
@@ -1828,13 +1839,13 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
       --MBBI;
     } else {
       unsigned Opc = (Uses64BitFramePtr ? X86::MOV64rr : X86::MOV32rr);
-      BuildMI(MBB, MBBI, DL, TII.get(Opc), StackPtr)
+      BuildMI(MBB, MBBI, DL, TII.get(Opc), FnStackPtr)
         .addReg(FramePtr);
       --MBBI;
     }
-  } else if (!SplitStack && NumBytes != 0) {
+  } else if (NumBytes != 0) {
     // Adjust stack pointer back: ESP += numbytes.
-    emitSPUpdate(MBB, MBBI, DL, StackPtr, NumBytes, /*InEpilogue=*/true);
+    emitSPUpdate(MBB, MBBI, DL, FnStackPtr, NumBytes, /*InEpilogue=*/true);
     if (!hasFP(MF) && NeedsDwarfCFI) {
       // Define the current CFA rule to use the provided offset.
       BuildCFI(MBB, MBBI, DL, MCCFIInstruction::createDefCfaOffset(
@@ -1846,6 +1857,8 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
   // SVA: Increment the unprotected (RBX) stack pointer as well.
   //    RBX += UnprStackIncSize
   if (UnprStackIncSize && MF.getTarget().Options.SplitStack) {
+    // Disabled now that we can use `emitSPUpdate` for the data stack.
+#if 0
     // RFLAGS shouldn't be live-in to any code from here to the end of the
     // basic block (and the function), but check it just in case since we're
     // about to clobber it with an ADD.
@@ -1868,6 +1881,7 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
     MI->getOperand(3).setIsDead(); // The RFLAGS implicit def is dead.
 
     --MBBI;
+#endif
   }
 
   // Windows unwinder will not invoke function's exception handler if IP is
