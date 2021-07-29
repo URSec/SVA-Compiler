@@ -1217,9 +1217,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
   // Don't do this for Win64, it needs to realign the stack after the prologue.
   if (!IsWin64Prologue && !IsFunclet && TRI->needsStackRealignment(MF)) {
     assert(HasFP && "There should be a frame pointer if stack is realigned.");
-    if (!SplitStack) {
-      BuildStackAlignAND(MBB, MBBI, DL, StackPtr, MaxAlign);
-    }
+    BuildStackAlignAND(MBB, MBBI, DL, FnStackPtr, MaxAlign);
 
     if (NeedsWinCFI) {
       HasWinCFI = true;
