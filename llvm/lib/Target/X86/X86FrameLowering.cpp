@@ -1146,7 +1146,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
           .addReg(FnStackPtr)
           .setMIFlag(MachineInstr::FrameSetup);
 
-      if (NeedsDwarfCFI) {
+      if (NeedsDwarfCFI && !SplitStack) {
         // Mark effective beginning of when frame pointer becomes valid.
         // Define the current CFA to use the EBP/RBP register.
         unsigned DwarfFramePtr = TRI->getDwarfRegNum(MachineFramePtr, true);
@@ -1185,7 +1185,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
 
   // Skip the callee-saved push instructions.
   bool PushedRegs = false;
-  int StackOffset = 2 * stackGrowth;
+  int StackOffset = (2 + HasFP) * stackGrowth;
 
   while (MBBI != MBB.end() &&
          MBBI->getFlag(MachineInstr::FrameSetup) &&
@@ -1195,7 +1195,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
     Register Reg = MBBI->getOperand(0).getReg();
     ++MBBI;
 
-    if (!HasFP && NeedsDwarfCFI) {
+    if ((!HasFP || SplitStack) && NeedsDwarfCFI) {
       // Mark callee-saved push instruction.
       // Define the current CFA rule to use the provided offset.
       assert(StackSize);
@@ -1575,7 +1575,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
 
   if (((!HasFP && NumBytes) || PushedRegs) && NeedsDwarfCFI) {
     // Mark end of stack pointer adjustment.
-    if (!HasFP && NumBytes) {
+    if (!HasFP && NumBytes && !SplitStack) {
       // Define the current CFA rule to use the provided offset.
       assert(StackSize);
       BuildCFI(MBB, MBBI, DL, MCCFIInstruction::createDefCfaOffset(
@@ -1740,7 +1740,7 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
     BuildMI(MBB, MBBI, DL, TII.get(Is64Bit ? X86::POP64r : X86::POP32r),
             MachineFramePtr)
         .setMIFlag(MachineInstr::FrameDestroy);
-    if (NeedsDwarfCFI) {
+    if (NeedsDwarfCFI && !SplitStack) {
       unsigned DwarfStackPtr =
           TRI->getDwarfRegNum(Is64Bit ? X86::RSP : X86::ESP, true);
       BuildCFI(MBB, MBBI, DL, MCCFIInstruction::createDefCfa(
@@ -1844,7 +1844,7 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
   } else if (NumBytes != 0) {
     // Adjust stack pointer back: ESP += numbytes.
     emitSPUpdate(MBB, MBBI, DL, FnStackPtr, NumBytes, /*InEpilogue=*/true);
-    if (!hasFP(MF) && NeedsDwarfCFI) {
+    if (!hasFP(MF) && !SplitStack && NeedsDwarfCFI) {
       // Define the current CFA rule to use the provided offset.
       BuildCFI(MBB, MBBI, DL, MCCFIInstruction::createDefCfaOffset(
                                   nullptr, -CSSize - SlotSize));
@@ -1891,9 +1891,9 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
   if (NeedsWin64CFI && MF.hasWinCFI())
     BuildMI(MBB, MBBI, DL, TII.get(X86::SEH_Epilogue));
 
-  if (!hasFP(MF) && NeedsDwarfCFI) {
+  if ((SplitStack || !hasFP(MF)) && NeedsDwarfCFI) {
     MBBI = FirstCSPop;
-    int64_t Offset = -CSSize - SlotSize;
+    int64_t Offset = -CSSize - (1 + hasFP(MF)) * SlotSize;
     // Mark callee-saved pop instruction.
     // Define the current CFA rule to use the provided offset.
     while (MBBI != MBB.end()) {
