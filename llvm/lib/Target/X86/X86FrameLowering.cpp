@@ -888,6 +888,26 @@ bool X86FrameLowering::has128ByteRedZone(const MachineFunction& MF) const {
   return Is64Bit && !IsWin64CC && !Fn.hasFnAttribute(Attribute::NoRedZone);
 }
 
+uint64_t X86FrameLowering::splitStackAlignOffset(const MachineFunction &MF) const {
+  const X86MachineFunctionInfo *X86FI = MF.getInfo<X86MachineFunctionInfo>();
+
+  uint64_t RASize = -getOffsetOfLocalArea();
+  uint64_t FPSize = hasFP(MF) ? SlotSize : 0;
+  uint64_t CSSize = X86FI->getCalleeSavedFrameSize();
+  /// The total size of what has been moved to the control stack
+  uint64_t ControlStackSize = RASize + FPSize + CSSize;
+  uint64_t Align = getStackAlignment();
+
+  // By adding this value to the amount of space we allocate on the data stack,
+  // we ensure that our offset from `Align` is what it would have been on a
+  // unified stack (usually 0).
+  //
+  // NB: For unknown reasons, LLVM does not always set up a function's stack so
+  // that proper alignment is maintained. This seems to be particuralry
+  // prevalent in unusual ABIs such as Win64.
+  return ControlStackSize % Align;
+}
+
 
 /// emitPrologue - Push callee-saved registers onto the stack, which
 /// automatically adjust the stack pointer. Adjust the stack pointer to allocate
@@ -1166,6 +1186,10 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
   } else {
     assert(!IsFunclet && "funclets without FPs not yet implemented");
     NumBytes = StackSize - X86FI->getCalleeSavedFrameSize();
+  }
+
+  if (SplitStack && !TRI->needsStackRealignment(MF) && NumBytes > 0) {
+    NumBytes += splitStackAlignOffset(MF);
   }
 
   // Update the offset adjustment, which is mainly used by codeview to translate
@@ -1733,6 +1757,11 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
   } else {
     NumBytes = StackSize - CSSize;
   }
+
+  if (SplitStack && !TRI->needsStackRealignment(MF) && NumBytes > 0) {
+    NumBytes += splitStackAlignOffset(MF);
+  }
+
   uint64_t SEHStackAllocAmt = NumBytes;
 
   if (HasFP) {
@@ -2030,12 +2059,16 @@ int X86FrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
   // callee-saved registers. Adjust the offset to compensate.
   if (SplitStack && IsFixed) {
     // No return address on the unprotected stack
-    Offset += getOffsetOfLocalArea();
+    Offset -= -getOffsetOfLocalArea();
     // No callee-saved registers on the unprotected stack
     Offset -= X86FI->getCalleeSavedFrameSize();
     // No saved frame pointer on the unprotected stack
     if (HasFP) {
       Offset -= SlotSize;
+    }
+    // Data stack alignment offset
+    if (!TRI->needsStackRealignment(MF) && MFI.getUnprStackFrameSize() > 0) {
+      Offset += splitStackAlignOffset(MF);
     }
   }
 

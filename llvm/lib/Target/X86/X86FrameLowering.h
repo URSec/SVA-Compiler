@@ -179,6 +179,9 @@ public:
   bool has128ByteRedZone(const MachineFunction& MF) const;
 
 private:
+  /// Determine the offset needed to align the data stack.
+  uint64_t splitStackAlignOffset(const MachineFunction &MF) const;
+
   uint64_t calculateMaxStackAlign(const MachineFunction &MF) const;
 
   /// Emit target stack probe as a call to a helper function
