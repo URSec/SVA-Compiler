@@ -1006,6 +1006,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
           ? Register(getX86SubSuperRegister(FramePtr, 64)) : FramePtr;
   Register BasePtr = TRI->getBaseRegister();
   bool HasWinCFI = false;
+  bool SplitStack = MF.getTarget().Options.SplitStack;
 
   // Debug location must be unknown since the first debug location is used
   // to determine the end of the prologue.
@@ -1215,7 +1216,9 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
   // Don't do this for Win64, it needs to realign the stack after the prologue.
   if (!IsWin64Prologue && !IsFunclet && TRI->needsStackRealignment(MF)) {
     assert(HasFP && "There should be a frame pointer if stack is realigned.");
-    BuildStackAlignAND(MBB, MBBI, DL, StackPtr, MaxAlign);
+    if (!SplitStack) {
+      BuildStackAlignAND(MBB, MBBI, DL, StackPtr, MaxAlign);
+    }
 
     if (NeedsWinCFI) {
       HasWinCFI = true;
@@ -1353,7 +1356,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
       MI->setFlag(MachineInstr::FrameSetup);
       MBB.insert(MBBI, MI);
     }
-  } else if (NumBytes) {
+  } else if (!SplitStack && NumBytes != 0) {
     emitSPUpdate(MBB, MBBI, DL, StackPtr, -(int64_t)NumBytes, /*InEpilogue=*/false);
   }
 
@@ -1706,6 +1709,7 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
   unsigned CSSize = X86FI->getCalleeSavedFrameSize();
   bool HasFP = hasFP(MF);
   uint64_t NumBytes = 0;
+  bool SplitStack = MF.getTarget().Options.SplitStack;
 
   bool NeedsDwarfCFI = (!MF.getTarget().getTargetTriple().isOSDarwin() &&
                         !MF.getTarget().getTargetTriple().isOSWindows()) &&
@@ -1799,9 +1803,11 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
   // If dynamic alloca is used, then reset esp to point to the last callee-saved
   // slot before popping them off! Same applies for the case, when stack was
   // realigned. Don't do this if this was a funclet epilogue, since the funclets
-  // will not do realignment or dynamic stack allocation.
+  // will not do realignment or dynamic stack allocation. Also don't do this for
+  // split stack, where the hardware stack pointer always points to the end of
+  // the callee-saved registers.
   if ((TRI->needsStackRealignment(MF) || MFI.hasVarSizedObjects()) &&
-      !IsFunclet) {
+      !IsFunclet && !SplitStack) {
     if (TRI->needsStackRealignment(MF))
       MBBI = FirstCSPop;
     unsigned SEHFrameOffset = calculateSetFPREG(SEHStackAllocAmt);
@@ -1826,7 +1832,7 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
         .addReg(FramePtr);
       --MBBI;
     }
-  } else if (NumBytes) {
+  } else if (!SplitStack && NumBytes != 0) {
     // Adjust stack pointer back: ESP += numbytes.
     emitSPUpdate(MBB, MBBI, DL, StackPtr, NumBytes, /*InEpilogue=*/true);
     if (!hasFP(MF) && NeedsDwarfCFI) {
@@ -1984,8 +1990,8 @@ int X86FrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
     // shouldn't have any references to them.
     assert(!(IsFixed && MFI.isSpillSlotObjectIndex(FI)));
     if (IsFixed && FI == X86FI->getRAIndex()) {
-      FrameReg = HasFP ? TRI->getFramePtr() : TRI->getStackRegister();
-      return Offset + (HasFP ? SlotSize : StackSize);
+      FrameReg = TRI->getStackRegister();
+      return CSSize + HasFP * SlotSize;
     }
     FrameReg = TRI->getSplitStackRegister();
   } else if (TRI->hasBasePointer(MF)) {
