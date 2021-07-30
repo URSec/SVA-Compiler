@@ -252,7 +252,7 @@ flagsNeedToBePreservedBeforeTheTerminators(const MachineBasicBlock &MBB) {
 /// stack pointer by a constant value.
 void X86FrameLowering::emitSPUpdate(MachineBasicBlock &MBB,
                                     MachineBasicBlock::iterator &MBBI,
-                                    const DebugLoc &DL,
+                                    const DebugLoc &DL, Register StackReg,
                                     int64_t NumBytes, bool InEpilogue) const {
   bool isSub = NumBytes < 0;
   uint64_t Offset = isSub ? -NumBytes : NumBytes;
@@ -279,8 +279,8 @@ void X86FrameLowering::emitSPUpdate(MachineBasicBlock &MBB,
       BuildMI(MBB, MBBI, DL, TII.get(MovRIOpc), Reg)
           .addImm(Offset)
           .setMIFlag(Flag);
-      MachineInstr *MI = BuildMI(MBB, MBBI, DL, TII.get(AddSubRROpc), StackPtr)
-                             .addReg(StackPtr)
+      MachineInstr *MI = BuildMI(MBB, MBBI, DL, TII.get(AddSubRROpc), StackReg)
+                             .addReg(StackReg)
                              .addReg(Reg);
       MI->getOperand(3).setIsDead(); // The EFLAGS implicit def is dead.
       return;
@@ -307,22 +307,22 @@ void X86FrameLowering::emitSPUpdate(MachineBasicBlock &MBB,
           .setMIFlag(Flag);
       MachineInstr *MI = BuildMI(MBB, MBBI, DL, TII.get(X86::ADD64rr), Rax)
                              .addReg(Rax)
-                             .addReg(StackPtr);
+                             .addReg(StackReg);
       MI->getOperand(3).setIsDead(); // The EFLAGS implicit def is dead.
       // Exchange the new SP in RAX with the top of the stack.
       addRegOffset(
           BuildMI(MBB, MBBI, DL, TII.get(X86::XCHG64rm), Rax).addReg(Rax),
-          StackPtr, false, 0);
+          StackReg, false, 0);
       // Load new SP from the top of the stack into RSP.
-      addRegOffset(BuildMI(MBB, MBBI, DL, TII.get(X86::MOV64rm), StackPtr),
-                   StackPtr, false, 0);
+      addRegOffset(BuildMI(MBB, MBBI, DL, TII.get(X86::MOV64rm), StackReg),
+                   StackReg, false, 0);
       return;
     }
   }
 
   while (Offset) {
     uint64_t ThisVal = std::min(Offset, Chunk);
-    if (ThisVal == SlotSize) {
+    if (ThisVal == SlotSize && StackReg == StackPtr) {
       // Use push / pop for slot sized adjustments as a size optimization. We
       // need to find a dead register when using pop.
       unsigned Reg = isSub
@@ -340,7 +340,7 @@ void X86FrameLowering::emitSPUpdate(MachineBasicBlock &MBB,
       }
     }
 
-    BuildStackAdjustment(MBB, MBBI, DL, StackPtr,
+    BuildStackAdjustment(MBB, MBBI, DL, StackReg,
                          isSub ? -ThisVal : ThisVal, InEpilogue)
         .setMIFlag(Flag);
 
@@ -1030,7 +1030,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
       Fn.arg_size() == 2) {
     StackSize += 8;
     MFI.setStackSize(StackSize);
-    emitSPUpdate(MBB, MBBI, DL, -8, /*InEpilogue=*/false);
+    emitSPUpdate(MBB, MBBI, DL, StackPtr, -8, /*InEpilogue=*/false);
   }
 
   // If this is x86-64 and the Red Zone is not disabled, if we are a leaf
@@ -1354,7 +1354,7 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
       MBB.insert(MBBI, MI);
     }
   } else if (NumBytes) {
-    emitSPUpdate(MBB, MBBI, DL, -(int64_t)NumBytes, /*InEpilogue=*/false);
+    emitSPUpdate(MBB, MBBI, DL, StackPtr, -(int64_t)NumBytes, /*InEpilogue=*/false);
   }
 
   // SVA: Decrement the unprotected (R15) stack pointer as well.
@@ -1828,7 +1828,7 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
     }
   } else if (NumBytes) {
     // Adjust stack pointer back: ESP += numbytes.
-    emitSPUpdate(MBB, MBBI, DL, NumBytes, /*InEpilogue=*/true);
+    emitSPUpdate(MBB, MBBI, DL, StackPtr, NumBytes, /*InEpilogue=*/true);
     if (!hasFP(MF) && NeedsDwarfCFI) {
       // Define the current CFA rule to use the provided offset.
       BuildCFI(MBB, MBBI, DL, MCCFIInstruction::createDefCfaOffset(
@@ -1897,7 +1897,7 @@ void X86FrameLowering::emitEpilogue(MachineFunction &MF,
     if (Offset) {
       // Check for possible merge with preceding ADD instruction.
       Offset += mergeSPUpdates(MBB, Terminator, true);
-      emitSPUpdate(MBB, Terminator, DL, Offset, /*InEpilogue=*/true);
+      emitSPUpdate(MBB, Terminator, DL, StackPtr, Offset, /*InEpilogue=*/true);
     }
   }
 }

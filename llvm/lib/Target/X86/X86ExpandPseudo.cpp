@@ -243,6 +243,7 @@ bool X86ExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
     assert(StackAdjust.isImm() && "Expecting immediate value.");
 
     // Adjust stack pointer.
+    Register StackPtr = TRI->getStackRegister();
     int StackAdj = StackAdjust.getImm();
     int MaxTCDelta = X86FI->getTCReturnAddrDelta();
     int Offset = 0;
@@ -259,7 +260,7 @@ bool X86ExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
     if (Offset) {
       // Check for possible merge with preceding ADD instruction.
       Offset += X86FL->mergeSPUpdates(MBB, MBBI, true);
-      X86FL->emitSPUpdate(MBB, MBBI, DL, Offset, /*InEpilogue=*/true);
+      X86FL->emitSPUpdate(MBB, MBBI, DL, StackPtr, Offset, /*InEpilogue=*/true);
     }
 
     // Jump to label or value in register.
@@ -341,8 +342,9 @@ bool X86ExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
   }
   case X86::IRET: {
     // Adjust stack to erase error code
+    Register StackPtr = TRI->getStackRegister();
     int64_t StackAdj = MBBI->getOperand(0).getImm();
-    X86FL->emitSPUpdate(MBB, MBBI, DL, StackAdj, true);
+    X86FL->emitSPUpdate(MBB, MBBI, DL, StackPtr, StackAdj, true);
     // Replace pseudo with machine iret
     BuildMI(MBB, MBBI, DL,
             TII->get(STI->is64Bit() ? X86::IRET64 : X86::IRET32));
@@ -351,6 +353,7 @@ bool X86ExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
   }
   case X86::RET: {
     // Adjust stack to erase error code
+    Register StackPtr = TRI->getStackRegister();
     int64_t StackAdj = MBBI->getOperand(0).getImm();
     MachineInstrBuilder MIB;
     if (StackAdj == 0) {
@@ -366,7 +369,7 @@ bool X86ExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
       // A ret can only handle immediates as big as 2**16-1.  If we need to pop
       // off bytes before the return address, we must do it manually.
       BuildMI(MBB, MBBI, DL, TII->get(X86::POP32r)).addReg(X86::ECX, RegState::Define);
-      X86FL->emitSPUpdate(MBB, MBBI, DL, StackAdj, /*InEpilogue=*/true);
+      X86FL->emitSPUpdate(MBB, MBBI, DL, StackPtr, StackAdj, /*InEpilogue=*/true);
       BuildMI(MBB, MBBI, DL, TII->get(X86::PUSH32r)).addReg(X86::ECX);
       MIB = BuildMI(MBB, MBBI, DL, TII->get(X86::RETL));
     }
@@ -379,6 +382,7 @@ bool X86ExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
   case X86::JMPRETIL:
   case X86::JMPRETIQ: {
     MachineInstrBuilder MIB;
+    Register StackPtr = TRI->getStackRegister();
     int64_t StackAdj = MBBI->getOperand(1).getImm();
 
     if (!AttemptConvertMovToPop(std::prev(MBBI))) {
@@ -386,7 +390,7 @@ bool X86ExpandPseudo::ExpandMI(MachineBasicBlock &MBB,
     }
 
     if (StackAdj > 0) {
-      X86FL->emitSPUpdate(MBB, MBBI, DL, StackAdj, /*InEpilogue=*/true);
+      X86FL->emitSPUpdate(MBB, MBBI, DL, StackPtr, StackAdj, /*InEpilogue=*/true);
     }
     MIB = BuildMI(MBB, MBBI, DL,
                   TII->get(Opcode == X86::JMPRETIQ ?
