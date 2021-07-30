@@ -1319,6 +1319,9 @@ void X86FrameLowering::emitPrologue(MachineFunction &MF,
   if (IsWin64Prologue && !IsFunclet && TRI->needsStackRealignment(MF))
     AlignedNumBytes = alignTo(AlignedNumBytes, MaxAlign);
   if (AlignedNumBytes >= StackProbeSize && UseStackProbe) {
+    // Note (Colin, 2021-07-28): On split stack, this code won't correctly
+    // restore a spilled `%eax`.
+    assert(!SplitStack && "Stack probes not yet supported with split stack");
     assert(!X86FI->getUsesRedZone() &&
            "The Red Zone is not accounted for in stack probes");
 
