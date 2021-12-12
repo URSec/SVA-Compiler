@@ -370,7 +370,8 @@ void MCObjectStreamer::EmitInstruction(const MCInst &Inst,
                                        const MCSubtargetInfo &STI) {
   const MCContext &Ctx = getContext();
   const MCInstrInfo &MII = *Ctx.getInstrInfo();
-  bool NeedsBundleLock = Ctx.sva() && MII.get(Inst.getOpcode()).isCall();
+  /* Not necessary for split stack. */
+  bool NeedsBundleLock = false; //Ctx.sva() && MII.get(Inst.getOpcode()).isCall();
   if (NeedsBundleLock) {
     EmitBundleLock(/* AlignToEnd */ true);
   } else {
