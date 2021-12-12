@@ -4,6 +4,8 @@
 ;;; This test checks that SVA's CFI pass properly instruments indirect branches.
 ;;;-----------------------------------------------------------------------------
 
+; CFI address space masking is currently disabled. TODO: make this a command-line option.
+; XFAIL: *
 ; RUN: opt -sva-cfi -S < %s | FileCheck %s
 
 target datalayout = "e-m:e-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-p:64:64:64-n8:16:32:64"

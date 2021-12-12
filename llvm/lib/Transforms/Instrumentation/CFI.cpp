@@ -96,6 +96,9 @@ Value *CFI::addBitMasking(Value &Callee, Instruction &I) {
                                                 Callee.getName() + ".aligned",
                                                 &I);
 
+#if 1
+  return new IntToPtrInst(AlignedCallee, Callee.getType(), AlignedCallee->getName(), &I);
+#else
   if (UseMPX) {
     /// A reference to the context to the LLVM module which this code is
     /// transforming.
@@ -136,6 +139,7 @@ Value *CFI::addBitMasking(Value &Callee, Instruction &I) {
 
     return Final;
   }
+#endif
 }
 
 std::pair<BasicBlock*, BasicBlock::iterator>
@@ -212,6 +216,9 @@ CFI::visitCallBase(CallBase &CI) {
 
 llvm::Optional<std::pair<BasicBlock*, BasicBlock::iterator>>
 CFI::visitReturnInst(ReturnInst &RI) {
+#if 1
+  return None;
+#else
   LLVMContext& Ctx = RI.getContext();
 
   Function *RetAddrIntrin
@@ -230,6 +237,7 @@ CFI::visitReturnInst(ReturnInst &RI) {
   CallInst::Create(SetRetAddrIntrin, { MaskedRetAddr }, "", &RI);
 
   return Next;
+#endif
 }
 
 llvm::Optional<std::pair<BasicBlock*, BasicBlock::iterator>>
